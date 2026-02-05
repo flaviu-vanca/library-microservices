@@ -1,0 +1,52 @@
+# Build output
+target/
+build/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+.vscode/
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+.m2/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.dockerhub
+
+# Spring Boot
+*.pid
+
+# Test
+test-output/
+coverage/
+
+# Docker and temp work
+mysql_library_data/
+mysql_inventory_data/
+tmp/
+temp/
+*.tmp
+.tmp-standalone/
+db-images/
+
+# Local tooling output
+.playwright-cli/

@@ -1,0 +1,14 @@
+.git
+.gitignore
+.idea
+.vscode
+.playwright-cli
+.m2
+.env
+tmp
+temp
+target
+**/target
+mysql_library_data
+mysql_inventory_data
+mysql_auth_data
