@@ -1,0 +1,63 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native  # Use native profile for local file system (simpler than git)
+  cloud:
+    config:
+      server:
+        # Native profile - reads from local file system (no Git required)
+        native:
+          search-locations: file:./config-repo, file:../config-repo, classpath:/config-repo
+        # Git profile - uncomment and switch active profile to 'git' for Git-backed config
+        # git:
+        #   uri: file:///${user.dir}/../config-repo
+        #   default-label: main
+        #   clone-on-start: false
+
+# Register with Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    # Retry connecting to Eureka if not available
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# Disable security for development
+spring.security.user:
+  name: config
+  password: config
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh,env
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,diskSpace,ping
+        liveness:
+          include: livenessState
+  health:
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
+
+# Logging for troubleshooting
+logging:
+  level:
+    org.springframework.cloud.config: DEBUG

@@ -1,0 +1,67 @@
+# =============================================================
+# SHARED CONFIGURATION - Applied to ALL services
+# =============================================================
+# This file contains default configuration inherited by all
+# microservices that pull from Config Server.
+# =============================================================
+
+# JWT Security Configuration (shared)
+# Using symmetric key for simplicity - in production use asymmetric keys
+jwt:
+  secret: mySecretKeyForJWTTokenGenerationMustBeAtLeast256BitsLong123456789
+  expiration: 1800000  # 30 minutes in milliseconds
+
+# Eureka Client Configuration (shared by all services)
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    registry-fetch-interval-seconds: 5
+    initial-instance-info-replication-interval-seconds: 5
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+# Actuator Configuration (shared)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,refresh
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,diskSpace,ping
+        liveness:
+          include: livenessState
+  health:
+    circuitbreakers:
+      enabled: true
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
+
+# Distributed Tracing (shared)
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9412/api/v2/spans
+
+# Logging Configuration (shared)
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{traceId:-}/%X{spanId:-}] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.tus.microservices: DEBUG
+    org.springframework.cloud: INFO

@@ -1,0 +1,16 @@
+# =============================================================
+# INVENTORY SERVICE - Development Profile
+# =============================================================
+
+spring:
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create-drop
+
+# More verbose logging in dev
+logging:
+  level:
+    com.tus.microservices.inventory: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
