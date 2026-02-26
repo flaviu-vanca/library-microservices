@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library Member Access</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <main class="shell stack">
+    <section id="auth-view" class="grid">
+      <section class="panel hero">
+        <div>
+          <span class="pill">Member Access</span>
+          <h1>Log in, see every library, and find books quickly.</h1>
+        </div>
+        <div class="meta">
+          <div class="mini"><strong>1. Join</strong><p>Create an account or log in as a member.</p></div>
+          <div class="mini"><strong>2. Browse</strong><p>See every library after authentication.</p></div>
+          <div class="mini"><strong>3. Search</strong><p>Search a book and check its availability.</p></div>
+        </div>
+        <div class="mini">
+          <p id="auth-strategy-note">Members can authenticate with email/password, Google, GitHub or Facebook. Social login still ends with the same JWT member session.</p>
+        </div>
+      </section>
+
+      <section class="panel form">
+        <div>
+          <span class="pill">Authentication</span>
+          <h2 class="section-title">Member login or signup</h2>
+        </div>
+        <div class="tabs">
+          <button id="login-tab" type="button" class="tab-on">Member Login</button>
+          <button id="signup-tab" type="button" class="tab-off">Create Account</button>
+        </div>
+        <div id="auth-notice" class="notice"></div>
+        <form id="auth-form" class="form">
+          <label id="name-wrap" class="hidden">
+            Full name
+            <input id="full-name" type="text" autocomplete="name" placeholder="Flaviu Vanca">
+          </label>
+          <label>
+            Email
+            <input id="email" type="email" autocomplete="email" placeholder="member@library.local" required>
+          </label>
+          <label>
+            Password
+            <input id="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" required>
+          </label>
+          <div class="row">
+            <button id="auth-submit" type="submit">Log In</button>
+            <button id="auth-clear" type="button" class="secondary">Clear</button>
+          </div>
+        </form>
+        <div id="oauth-panel" class="stack">
+          <div id="oauth-caption" class="oauth-caption">Or continue with Google, GitHub, or Facebook. Configured providers are clickable; the rest need client IDs and secrets first.</div>
+          <div id="oauth-buttons" class="oauth-actions"></div>
+        </div>
+        <p id="password-helper" class="helper">
+          Local passwords are stored as BCrypt hashes. For Google, GitHub, or Facebook OAuth,
+          the provider password would not be stored in this database.
+        </p>
+      </section>
+    </section>
+
+    <section id="app-view">
+      <section class="panel stack">
+        <div class="dashboard-banner">
+          <span class="pill dashboard-pill">Member Dashboard</span>
+          <button id="logout" type="button" class="ghost">Log Out</button>
+        </div>
+        <div class="stack dashboard-copy">
+          <h2 id="welcome">Welcome.</h2>
+          <p>Browse the libraries first, then search for any book and inspect where it is stocked.</p>
+        </div>
+        <div class="mini session-strip">
+          <div class="session-summary">
+            <span class="session-item"><strong>Signed in as:</strong><span id="member-email" class="session-value">No member</span></span>
+            <span class="session-sep">•</span>
+            <span class="session-item"><strong>Role:</strong><span id="member-role" class="session-value">USER</span></span>
+            <span class="session-sep">•</span>
+            <span class="session-item"><strong>Security mode:</strong><span class="session-value">JWT through gateway</span></span>
+            <span class="session-sep">•</span>
+            <span class="session-item"><strong>Token expires in:</strong><span id="token-expiry" class="session-value">00:00:00</span></span>
+          </div>
+          <div class="session-actions">
+            <div id="session-status" class="session-status">Tokens are valid for 30 minutes and can be extended once in the last 5 minutes.</div>
+            <button id="renew-token" type="button" class="ghost small hidden">Extend Time</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="app-grid">
+        <section class="panel stack">
+          <div>
+            <span class="pill">Libraries</span>
+            <h2 class="section-title">All libraries</h2>
+          </div>
+          <p>These records come from the protected libraries endpoint after login. Open each card to inspect the branch details from top to bottom.</p>
+          <div id="libraries" class="cards"></div>
+        </section>
+
+        <section class="stack side-rail">
+          <section id="search-panel" class="panel search">
+            <div>
+              <span class="pill">Search</span>
+              <h2 class="section-title">Find a book</h2>
+            </div>
+            <p>Use one search box for title, author, genre, or ISBN prefix matching.</p>
+            <div id="search-notice" class="notice"></div>
+            <form id="search-form" class="search">
+              <div class="search-row">
+                <label>
+                  Search books
+                  <input id="search-query" type="text" minlength="1" placeholder="Clean Code, Robert C. Martin, Technology, 978-0-13-468599-1...">
+                </label>
+                <button id="search-button" type="submit">Search Books</button>
+              </div>
+            </form>
+          </section>
+
+          <section id="results-panel" class="panel stack">
+            <div>
+              <span class="pill">Results</span>
+              <h2 class="section-title">Availability</h2>
+            </div>
+            <div id="results-summary" class="helper">Search for a book to see where it is held and whether it is currently available.</div>
+            <div id="results" class="results">
+              <div class="empty">Start with a search term. Results will show the title, library, availability, and branch detail on demand.</div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </section>
+  </main>
+  <script src="/index.js"></script>
+</body>
+</html>
+
