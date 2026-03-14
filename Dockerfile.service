@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1.7
+
+ARG JAVA_VERSION=23
+ARG MAVEN_VERSION=3.9.9
+
+FROM maven:${MAVEN_VERSION}-eclipse-temurin-${JAVA_VERSION} AS build
+ARG MODULE
+WORKDIR /workspace
+
+COPY pom.xml ./
+COPY discovery-server/pom.xml discovery-server/pom.xml
+COPY config-server/pom.xml config-server/pom.xml
+COPY gateway-service/pom.xml gateway-service/pom.xml
+COPY auth-service/pom.xml auth-service/pom.xml
+COPY library-service/pom.xml library-service/pom.xml
+COPY inventory-service/pom.xml inventory-service/pom.xml
+
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -ntp -pl ${MODULE} -am dependency:go-offline
+
+COPY ${MODULE}/src ${MODULE}/src
+
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -B -ntp -DskipTests -pl ${MODULE} -am package
+
+FROM eclipse-temurin:${JAVA_VERSION}-jre
+ARG MODULE
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /workspace/${MODULE}/target/*.jar /app/app.jar
+COPY config-repo /app/config-repo
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

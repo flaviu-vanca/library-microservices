@@ -1,0 +1,316 @@
+# =============================================================
+# Docker Compose - Full Microservices Stack
+# =============================================================
+# Usage:
+#   1. Start all:         docker compose up --build -d
+#   2. View logs:         docker compose logs -f
+#   3. Stop all:          docker compose down
+# Host-side ports can be overridden via .env (see .env.example)
+# =============================================================
+
+services:
+  # =============================================================
+  # INFRASTRUCTURE
+  # =============================================================
+
+  mysql-library:
+    image: mysql:8.0
+    container_name: mysql-library
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: library_db
+    ports:
+      - "${MYSQL_LIBRARY_HOST_PORT:-3306}:3306"
+    volumes:
+      - mysql_library_data:/var/lib/mysql
+      - ./scripts/init-library-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - microservices-network
+
+  mysql-inventory:
+    image: mysql:8.0
+    container_name: mysql-inventory
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: inventory_db
+    ports:
+      - "${MYSQL_INVENTORY_HOST_PORT:-3307}:3306"
+    volumes:
+      - mysql_inventory_data:/var/lib/mysql
+      - ./scripts/init-inventory-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - microservices-network
+
+  mysql-auth:
+    image: mysql:8.0
+    container_name: mysql-auth
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: auth_db
+    ports:
+      - "${MYSQL_AUTH_HOST_PORT:-3308}:3306"
+    volumes:
+      - mysql_auth_data:/var/lib/mysql
+      - ./scripts/init-auth-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - microservices-network
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    ports:
+      - "${ZIPKIN_HOST_PORT:-9412}:9411"
+    networks:
+      - microservices-network
+
+  # =============================================================
+  # MICROSERVICES
+  # =============================================================
+
+  discovery-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: discovery-server
+    image: library-microservices/discovery-server:local
+    container_name: discovery-server
+    ports:
+      - "${DISCOVERY_HOST_PORT:-8761}:8761"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks:
+      - microservices-network
+
+  config-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: config-server
+    image: library-microservices/config-server:local
+    container_name: config-server
+    volumes:
+      - ./config-repo:/app/config-repo:ro
+    ports:
+      - "${CONFIG_HOST_PORT:-8888}:8888"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8888/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks:
+      - microservices-network
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: auth-service
+    image: library-microservices/auth-service:local
+    container_name: auth-service
+    ports:
+      - "${AUTH_HOST_PORT:-8084}:8084"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-auth:3306/auth_db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - AUTH_OAUTH2_SUCCESS_REDIRECT_URI=http://localhost:${GATEWAY_HOST_PORT:-8085}/
+      - AUTH_OAUTH2_CALLBACK_REDIRECT_URI=http://localhost:${GATEWAY_HOST_PORT:-8085}/auth/login/oauth2/code/{registrationId}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - FACEBOOK_CLIENT_ID=${FACEBOOK_CLIENT_ID:-}
+      - FACEBOOK_CLIENT_SECRET=${FACEBOOK_CLIENT_SECRET:-}
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql-auth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8084/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+    networks:
+      - microservices-network
+
+  library-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: library-service
+    image: library-microservices/library-service:local
+    container_name: library-service
+    ports:
+      - "${LIBRARY_HOST_PORT:-8081}:8081"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-library:3306/library_db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql-library:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+    networks:
+      - microservices-network
+
+  library-service-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: library-service
+    image: library-microservices/library-service:local
+    container_name: library-service-2
+    ports:
+      - "${LIBRARY_REPLICA_HOST_PORT:-8082}:8081"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-library:3306/library_db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql-library:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8081/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+    networks:
+      - microservices-network
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: inventory-service
+    image: library-microservices/inventory-service:local
+    container_name: inventory-service
+    ports:
+      - "${INVENTORY_HOST_PORT:-8083}:8083"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-inventory:3306/inventory_db
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql-inventory:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8083/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+    networks:
+      - microservices-network
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: gateway-service
+    image: library-microservices/gateway-service:local
+    container_name: gateway-service
+    ports:
+      - "${GATEWAY_HOST_PORT:-8085}:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URI=http://config-server:8888
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      library-service:
+        condition: service_healthy
+      library-service-2:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 75s
+    networks:
+      - microservices-network
+
+# =============================================================
+# Volumes & Networks
+# =============================================================
+volumes:
+  mysql_library_data:
+  mysql_inventory_data:
+  mysql_auth_data:
+
+networks:
+  microservices-network:
+    driver: bridge
