@@ -89,7 +89,13 @@ function Get-ExceptionDetail {
         return "HTTP $statusCode"
     }
 
-    $message = ($Exception.Message ?? "Unknown error").Trim()
+    $message = "Unknown error"
+    if ($null -ne $Exception -and $null -ne $Exception.Message) {
+        $candidate = $Exception.Message.Trim()
+        if ($candidate) {
+            $message = $candidate
+        }
+    }
     if ($message.Length -le 120) {
         return $message
     }
@@ -382,15 +388,36 @@ Invoke-SafeCheck -Name "Availability flow" -Action {
         return
     }
 
-    $availability = Invoke-RestMethod -Uri "$GatewayBaseUrl/api/books/$BookId/availability" -Headers @{ Authorization = "Bearer $script:UserToken" } -TimeoutSec 5
-    if ($availability.id -ne [int]$BookId) {
-        throw "Book ID mismatch in availability response"
+    $availability = $null
+    $maxAttempts = 5
+    $attemptDelaySeconds = 2
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            $candidate = Invoke-RestMethod -Uri "$GatewayBaseUrl/api/books/$BookId/availability" -Headers @{ Authorization = "Bearer $script:UserToken" } -TimeoutSec 5
+            if ($candidate.id -ne [int]$BookId) {
+                throw "Book ID mismatch in availability response"
+            }
+            if (-not $candidate.inventory) {
+                throw "No inventory object returned"
+            }
+            if ($candidate.inventory.totalCopies -le 0) {
+                throw "Inventory fallback or empty inventory returned"
+            }
+
+            $availability = $candidate
+            break
+        } catch {
+            if ($attempt -eq $maxAttempts) {
+                throw
+            }
+
+            Start-Sleep -Seconds $attemptDelaySeconds
+        }
     }
-    if (-not $availability.inventory) {
-        throw "No inventory object returned"
-    }
-    if ($availability.inventory.totalCopies -le 0) {
-        throw "Inventory fallback or empty inventory returned"
+
+    if ($null -eq $availability) {
+        throw "Availability flow did not return a valid response"
     }
 
     Add-Result -Check "Availability flow" -Status "PASS" -Details "Book $BookId returned live inventory (totalCopies=$($availability.inventory.totalCopies))"
