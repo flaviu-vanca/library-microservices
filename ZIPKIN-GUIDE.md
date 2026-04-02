@@ -67,13 +67,15 @@ This project is already configured to send traces to Zipkin.
 In [docker-compose.yml](K:\Semester 2\Microservices Architecture\Assignment #2\library-microservices-cloud-native\docker-compose.yml#L74), Zipkin is run as:
 
 - service name: `zipkin`
-- image: `openzipkin/zipkin:latest`
-- host port: `9412`
+- image: `openzipkin/zipkin:3.6.0`
+- host port: `9411`
+
+The image is pinned on purpose so a new upstream Zipkin release does not silently break the local demo environment.
 
 So the UI is available at:
 
 ```text
-http://localhost:9412
+http://localhost:9411
 ```
 
 ### Shared tracing configuration
@@ -81,7 +83,7 @@ http://localhost:9412
 In [application.yml](K:\Semester 2\Microservices Architecture\Assignment #2\library-microservices-cloud-native\config-repo\application.yml#L39), tracing is configured centrally:
 
 - sampling probability is `1.0`
-- Zipkin endpoint is `http://localhost:9412/api/v2/spans` for host-based local runs
+- Zipkin endpoint is `http://localhost:9411/api/v2/spans` for host-based local runs
 - log pattern includes `traceId` and `spanId`
 
 That means:
@@ -90,7 +92,7 @@ That means:
 - the services are already pointing to Zipkin
 - logs and traces can be correlated
 
-When the stack runs through Docker Compose, the containers override the exporter with `MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans`. The host-facing UI still stays on `http://localhost:9412`.
+When the stack runs through Docker Compose, the containers override the exporter with `MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans`. The host-facing UI stays on `http://localhost:9411`.
 
 ### Important implementation note for the library hop
 
@@ -167,7 +169,7 @@ docker compose up --build -d
 Open Zipkin:
 
 ```text
-http://localhost:9412
+http://localhost:9411
 ```
 
 You can also run the existing smoke check:
@@ -273,7 +275,7 @@ Expected meaning:
 Go to:
 
 ```text
-http://localhost:9412
+http://localhost:9411
 ```
 
 ### Step 4: Query recent traces
@@ -484,7 +486,7 @@ The UI is enough for the assignment, but if you want more control, Zipkin also e
 Example:
 
 ```powershell
-curl.exe "http://localhost:9412/api/v2/traces?serviceName=gateway-service&limit=10"
+curl.exe "http://localhost:9411/api/v2/traces?serviceName=gateway-service&limit=10"
 ```
 
 ### Query dependency graph
@@ -492,7 +494,7 @@ curl.exe "http://localhost:9412/api/v2/traces?serviceName=gateway-service&limit=
 Example:
 
 ```powershell
-curl.exe "http://localhost:9412/api/v2/dependencies?endTs=9999999999999&lookback=86400000"
+curl.exe "http://localhost:9411/api/v2/dependencies?endTs=9999999999999&lookback=86400000"
 ```
 
 This is optional.
@@ -510,7 +512,7 @@ docker compose ps
 
 Make sure the `zipkin` container is running.
 
-Also confirm the host port is still `9412`.
+Also confirm the host port is still `9411`.
 
 ### Problem: Zipkin opens but no traces appear
 
@@ -564,7 +566,7 @@ Regenerate a fresh trace and query again.
 
 If you want the shortest working process:
 
-1. Open `http://localhost:9412`
+1. Open `http://localhost:9411`
 2. Create a token
 3. Run:
 

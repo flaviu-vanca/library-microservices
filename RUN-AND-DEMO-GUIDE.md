@@ -128,7 +128,7 @@ docker compose restart library-service-2
 | 📚 Library Service (Instance 1) | http://localhost:8081 | Direct access |
 | 📚 Library Service (Instance 2) | http://localhost:8082 | Second Service A replica |
 | 📦 Inventory Service | http://localhost:8083 | Direct access |
-| 🔭 Zipkin | http://localhost:9412 | Distributed tracing UI |
+| 🔭 Zipkin | http://localhost:9411 | Distributed tracing UI |
 | 📖 Auth Swagger | http://localhost:8084/swagger-ui.html | API docs |
 | 📖 Library Swagger | http://localhost:8081/swagger-ui.html | API docs |
 | 📖 Library Swagger (Replica 2) | http://localhost:8082/swagger-ui.html | API docs |
@@ -174,9 +174,10 @@ instances, not just the service name once.
 ### 📝 Create a Member Account
 
 ```powershell
+$Email = "member-demo-$(Get-Date -Format yyyyMMddHHmmss)@library.local"
 $SignupBody = @{
   fullName = "Member Example"
-  email = "member@example.com"
+  email = $Email
   password = "Library123"
 } | ConvertTo-Json
 
@@ -187,9 +188,11 @@ $TOKEN = (Invoke-RestMethod -Method Post -Uri "http://localhost:8085/auth/signup
 
 ### 🔑 Log In With an Existing Account
 
+Use `/auth/login` only after that member already exists. The auth bootstrap script does not seed default user accounts.
+
 ```powershell
 $LoginBody = @{
-  email = "member@example.com"
+  email = $Email
   password = "Library123"
 } | ConvertTo-Json
 
@@ -260,7 +263,7 @@ if ($pid) { Stop-Process -Id $pid -Force }
 ### 💀 Kill Switch: Free All Ports
 
 ```powershell
-@(8761,8888,8085,8084,8081,8082,8083,3306,3307,3308,9412) | ForEach-Object {
+@(8761,8888,8085,8084,8081,8082,8083,3306,3307,3308,9411) | ForEach-Object {
     $p = Get-NetTCPConnection -LocalPort $_ -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess
     if ($p) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
 }
@@ -299,12 +302,12 @@ curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8085/api/libraries
 
 **Symptom:** API returns 403 on POST/PUT/DELETE
 
-**Solution:** POST/PUT/DELETE require an ADMIN account. Provision the admin user in `auth_db`, then log in through the same password-based `/auth/login` endpoint.
+**Solution:** POST/PUT/DELETE require an `ADMIN` account. No admin user is seeded by default, so provision one directly in `auth_db`, then log in through the same password-based `/auth/login` endpoint.
 
 ```powershell
 $AdminLoginBody = @{
-  email = "admin@example.com"
-  password = "Admin123"
+  email = "your-admin-email@library.local"
+  password = "your-admin-password"
 } | ConvertTo-Json
 
 curl -Method Post -Uri "http://localhost:8085/auth/login" `
@@ -353,15 +356,17 @@ Docker Compose handles this order automatically via readiness health checks and 
 This project already includes seeded demo data. Use the existing records instead of recreating `Clean Code` and its inventory.
 
 ```powershell
-# 1. 🔑 Log in as a member
-$LoginBody = @{
-  email = "member@example.com"
+# 1. 🔑 Create a fresh member and capture a JWT
+$Email = "run-guide-$(Get-Date -Format yyyyMMddHHmmss)@library.local"
+$SignupBody = @{
+  fullName = "Run Guide Member"
+  email = $Email
   password = "Library123"
 } | ConvertTo-Json
 
-$USER = (Invoke-RestMethod -Method Post -Uri "http://localhost:8085/auth/login" `
+$USER = (Invoke-RestMethod -Method Post -Uri "http://localhost:8085/auth/signup" `
   -ContentType "application/json" `
-  -Body $LoginBody).access_token
+  -Body $SignupBody).access_token
 
 # 2. 📚 Read libraries through the gateway
 Invoke-RestMethod -Uri "http://localhost:8085/api/libraries" `
@@ -1083,7 +1088,7 @@ This guide walks through the user-facing demo of the system through the browser 
 |---|---|
 | Gateway UI | [Gateway UI](http://localhost:8085/) |
 | Eureka Dashboard | [Eureka Dashboard](http://localhost:8761) |
-| Zipkin Tracing | [Zipkin Tracing](http://localhost:9412) |
+| Zipkin Tracing | [Zipkin Tracing](http://localhost:9411) |
 
 ## Demo Goal
 
@@ -1098,19 +1103,19 @@ Show that the gateway exposes a real member-facing browser UI on top of the prot
 
 ## Before You Start
 
-After the stack is up and `docker compose ps` shows the core services as `healthy`, run the smoke check:
+You can run the smoke check after the core containers already show `healthy`. The script performs a point-in-time verification and reports pass/fail for the main demo path:
 
 ```powershell
 .\scripts\demo-check.ps1
 ```
 
-If the stack was just restarted, wait 30 to 90 seconds and rerun it until the happy path passes.
+Use `-NoPause` if you do not want the console window to stay open at the end.
 
 Open these tabs before the walkthrough:
 
 - [Gateway UI](http://localhost:8085/)
 - [Eureka Dashboard](http://localhost:8761)
-- [Zipkin Tracing](http://localhost:9412)
+- [Zipkin Tracing](http://localhost:9411)
 
 > ℹ️ **Default:** A fresh clone exposes the gateway UI on `http://localhost:8085/`. Override it in `.env` only if you need a different host port.
 
@@ -1307,7 +1312,7 @@ Suggested wrap-up line:
 
 If you want to connect the UI to the backend architecture, open Zipkin:
 
-[Zipkin Tracing](http://localhost:9412)
+[Zipkin Tracing](http://localhost:9411)
 
 After a recent search or availability request, explain the trace path:
 

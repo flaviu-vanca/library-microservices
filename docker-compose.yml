@@ -14,7 +14,8 @@ services:
   # =============================================================
 
   mysql-library:
-    image: mysql:8.0
+    # Pin MySQL to the tested patch release used by this demo stack.
+    image: mysql:8.0.45
     container_name: mysql-library
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -33,7 +34,7 @@ services:
       - microservices-network
 
   mysql-inventory:
-    image: mysql:8.0
+    image: mysql:8.0.45
     container_name: mysql-inventory
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -52,7 +53,7 @@ services:
       - microservices-network
 
   mysql-auth:
-    image: mysql:8.0
+    image: mysql:8.0.45
     container_name: mysql-auth
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -71,11 +72,11 @@ services:
       - microservices-network
 
   zipkin:
-    image: openzipkin/zipkin:latest
-    pull_policy: always
+    # Pin Zipkin to a tested release to avoid upstream "latest" regressions.
+    image: openzipkin/zipkin:3.6.0
     container_name: zipkin
     ports:
-      - "${ZIPKIN_HOST_PORT:-9412}:9411"
+      - "${ZIPKIN_HOST_PORT:-9411}:9411"
     networks:
       - microservices-network
 

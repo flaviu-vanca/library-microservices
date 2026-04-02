@@ -52,7 +52,7 @@ The main cross-service use case is `GET /api/books/{id}/availability`, where the
 | Library Service (Instance 1) | `8081` | Library and book CRUD, availability lookup |
 | Library Service (Instance 2) | `8082` on this host, `8081` in-container | Second Service A replica for discovery/load-balancing demos |
 | Inventory Service | `8083` | Inventory CRUD, branch stock, reserve/return operations |
-| Zipkin | `9412` | Distributed tracing UI |
+| Zipkin | `9411` | Distributed tracing UI |
 | MySQL Auth | `3308` | `auth_db` |
 | MySQL Library | `3306` | `library_db` |
 | MySQL Inventory | `3307` | `inventory_db` |
@@ -86,7 +86,7 @@ Gateway routes:
 | Maven | `3.9+` recommended |
 | Spring Boot | `3.5.13` |
 | Spring Cloud | `2025.0.1` |
-| MySQL | `8.0` |
+| MySQL | `8.0.45` |
 | Spring Cloud Gateway | via Spring Cloud BOM |
 | Resilience4j | via Spring Cloud circuit breaker starter |
 | Micrometer Tracing + Zipkin | enabled across services |
@@ -158,7 +158,7 @@ curl http://localhost:8761/eureka/apps
 curl http://localhost:8085/actuator/health/readiness
 ```
 
-The Compose stack now uses readiness probes and `depends_on: condition: service_healthy`. Wait until `docker compose ps` shows the core services as `healthy` before starting the demo or running API checks.
+The Compose stack now uses readiness probes and `depends_on: condition: service_healthy`. `.\scripts\demo-check.ps1` is a point-in-time smoke check, not a readiness poller, so run it after the core services already show `healthy`.
 
 Useful URLs:
 
@@ -169,11 +169,13 @@ Useful URLs:
 - 📚 Library Swagger: `http://localhost:8081/swagger-ui.html`
 - 📚 Library Swagger (Replica 2): `http://localhost:8082/swagger-ui.html`
 - 📦 Inventory Swagger: `http://localhost:8083/swagger-ui.html`
-- 🔭 Zipkin: `http://localhost:9412`
+- 🔭 Zipkin: `http://localhost:9411`
 
 ## 🔐 Authentication
 
 The gateway now exposes password-based auth endpoints for members:
+
+No auth users are seeded by default. Create a fresh member through `/auth/signup`, or log in only after that account already exists.
 
 ```powershell
 $Email = "member-demo-$(Get-Date -Format yyyyMMddHHmmss)@library.local"
@@ -288,7 +290,7 @@ Useful endpoints:
 - ❤️ `http://localhost:8085/actuator/health/readiness`
 - ❤️ `http://localhost:8081/actuator/health/readiness`
 - 🔌 `http://localhost:8081/actuator/circuitbreakers` (requires auth)
-- 🔭 `http://localhost:9412`
+- 🔭 `http://localhost:9411`
 
 ## 📖 Documentation
 
@@ -300,7 +302,7 @@ Detailed project docs already in the repo:
 
 ## 🧪 Testing Status
 
-Automated module-level tests are present and currently pass:
+Automated module-level tests are present in the repository:
 
 - `library-service`: `BookRepositoryTest` and `BookServiceTest` (`11` tests)
 - `gateway-service`: `RequiredServicesHealthIndicatorTest` (`2` tests)

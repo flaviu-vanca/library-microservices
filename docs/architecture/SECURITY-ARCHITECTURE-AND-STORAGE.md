@@ -65,11 +65,11 @@ Specifically, `GET /api/books/{id}/availability` reads book metadata from
 The current authentication model is JWT-based and is owned by
 `auth-service`.
 
-Public authentication endpoints:
+Auth endpoints exposed under `/auth/**`:
 
 - `POST /auth/signup`
 - `POST /auth/login`
-- `POST /auth/renew`
+- `POST /auth/renew` (requires a valid bearer token in the header)
 - `GET /auth/info`
 - OAuth2 provider initiation and callback endpoints under `/auth/**`
 
@@ -481,6 +481,11 @@ Key constraints:
 Relevant bootstrap:
 
 - `scripts/init-auth-db.sql`
+
+Important note:
+
+- `scripts/init-auth-db.sql` creates the auth schema only
+- it does not seed a default member or admin account
 
 What is not stored in `auth_db` today:
 
