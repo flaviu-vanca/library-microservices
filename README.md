@@ -135,7 +135,7 @@ The checked-in Compose defaults are enough for a fresh clone to run without crea
 
 Create a local `.env` file only if you want to override the default host ports or add your own social login credentials. The intended flow is:
 
-- fresh clone -> `docker compose up --build -d`
+- fresh clone -> `docker compose pull zipkin` then `docker compose up --build -d`
 - optional `.env` -> local overrides only
 
 ### ▶️ Build and Run Everything
@@ -143,10 +143,11 @@ Create a local `.env` file only if you want to override the default host ports o
 From a fresh clone:
 
 ```powershell
+docker compose pull zipkin
 docker compose up --build -d
 ```
 
-The first run builds the Spring Boot service images from source inside Docker, so it can take a few minutes.
+The first run builds the Spring Boot service images from source inside Docker, so it can take a few minutes. The explicit Zipkin pull avoids relying on implicit image fetching for that external service.
 
 If another local app is already using a port, copy `.env.example` to `.env` and adjust the host ports before starting.
 

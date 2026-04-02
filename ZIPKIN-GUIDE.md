@@ -161,6 +161,7 @@ The gateway readiness payload should report `requiredServices` as `UP`.
 If the stack is not running:
 
 ```powershell
+docker compose pull zipkin
 docker compose up --build -d
 ```
 

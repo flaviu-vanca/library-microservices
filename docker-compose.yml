@@ -2,7 +2,7 @@
 # Docker Compose - Full Microservices Stack
 # =============================================================
 # Usage:
-#   1. Start all:         docker compose up --build -d
+#   1. Start all:         docker compose pull zipkin && docker compose up --build -d
 #   2. View logs:         docker compose logs -f
 #   3. Stop all:          docker compose down
 # Host-side ports can be overridden via .env (see .env.example)
@@ -72,6 +72,7 @@ services:
 
   zipkin:
     image: openzipkin/zipkin:latest
+    pull_policy: always
     container_name: zipkin
     ports:
       - "${ZIPKIN_HOST_PORT:-9412}:9411"
