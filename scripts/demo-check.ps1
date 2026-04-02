@@ -3,7 +3,8 @@ param(
     [string]$LibraryBaseUrl = "http://localhost:8081",
     [string]$EurekaBaseUrl = "http://localhost:8761",
     [string]$BookId = "1",
-    [string]$Isbn = "978-0-13-468599-1"
+    [string]$Isbn = "978-0-13-468599-1",
+    [switch]$NoPause
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +38,21 @@ function Invoke-SafeCheck {
     } catch {
         $script:failed = $true
         Add-Result -Check $Name -Status "FAIL" -Details $_.Exception.Message
+    }
+}
+
+function Wait-BeforeExit {
+    if ($NoPause -or $Host.Name -ne "ConsoleHost") {
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Press any key to close..." -ForegroundColor DarkGray
+
+    try {
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    } catch {
+        # If key input is unavailable, just return.
     }
 }
 
@@ -160,8 +176,10 @@ $results | Format-Table -AutoSize
 if ($failed) {
     Write-Host ""
     Write-Host "Pre-demo check failed. Fix the failing items before presenting." -ForegroundColor Red
+    Wait-BeforeExit
     exit 1
 }
 
 Write-Host ""
 Write-Host "Pre-demo check passed. The happy-path demo is ready." -ForegroundColor Green
+Wait-BeforeExit
