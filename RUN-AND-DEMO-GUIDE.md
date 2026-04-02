@@ -35,14 +35,12 @@ Optional for local non-Docker builds and tests:
 ### ▶️ Start Everything From Source (Build + Run)
 
 ```powershell
-docker compose pull zipkin
 docker compose up --build -d
 ```
 
 ### ▶️ Start Everything + Follow Logs
 
 ```powershell
-docker compose pull zipkin
 docker compose up --build -d
 docker compose logs -f
 ```
@@ -51,7 +49,6 @@ docker compose logs -f
 
 ```powershell
 docker compose down
-docker compose pull zipkin
 docker compose up --build -d
 ```
 
@@ -59,7 +56,6 @@ docker compose up --build -d
 
 ```powershell
 docker compose down -v
-docker compose pull zipkin
 docker compose up --build -d
 ```
 
@@ -76,7 +72,6 @@ docker compose build
 ### ▶️ Start Only (after build)
 
 ```powershell
-docker compose pull zipkin
 docker compose up -d
 ```
 
@@ -392,9 +387,9 @@ Continue below for the Swagger-based API walkthrough and the browser-based UI wa
 
 | Action | Command |
 |--------|---------|
-| 🚀 Start all | `docker compose pull zipkin` then `docker compose up --build -d` |
-| 🔄 Full reset | `docker compose down` then `docker compose pull zipkin` then `docker compose up --build -d` |
-| 💣 Nuclear reset | `docker compose down -v` then `docker compose pull zipkin` then `docker compose up --build -d` |
+| 🚀 Start all | `docker compose up --build -d` |
+| 🔄 Full reset | `docker compose down && docker compose up --build -d` |
+| 💣 Nuclear reset | `docker compose down -v && docker compose up --build -d` |
 | ⏹️ Stop | `docker compose down` |
 | 📋 Logs | `docker compose logs -f` |
 | 📊 Status | `docker compose ps` |
