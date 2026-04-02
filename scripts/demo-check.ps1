@@ -42,22 +42,22 @@ function Invoke-SafeCheck {
 
 Write-Host "Running pre-demo checks..." -ForegroundColor Cyan
 
-Invoke-SafeCheck -Name "Eureka health" -Action {
-    $health = Invoke-RestMethod -Uri "$EurekaBaseUrl/actuator/health"
+Invoke-SafeCheck -Name "Eureka readiness" -Action {
+    $health = Invoke-RestMethod -Uri "$EurekaBaseUrl/actuator/health/readiness"
     if ($health.status -ne "UP") {
-        throw "Eureka health returned '$($health.status)'"
+        throw "Eureka readiness returned '$($health.status)'"
     }
     $script:eurekaReady = $true
-    Add-Result -Check "Eureka health" -Status "PASS" -Details "Eureka is UP"
+    Add-Result -Check "Eureka readiness" -Status "PASS" -Details "Eureka is ready"
 }
 
-Invoke-SafeCheck -Name "Gateway health" -Action {
-    $health = Invoke-RestMethod -Uri "$GatewayBaseUrl/actuator/health"
+Invoke-SafeCheck -Name "Gateway readiness" -Action {
+    $health = Invoke-RestMethod -Uri "$GatewayBaseUrl/actuator/health/readiness"
     if ($health.status -ne "UP") {
-        throw "Gateway health returned '$($health.status)'"
+        throw "Gateway readiness returned '$($health.status)'"
     }
     $script:gatewayReady = $true
-    Add-Result -Check "Gateway health" -Status "PASS" -Details "Gateway is UP"
+    Add-Result -Check "Gateway readiness" -Status "PASS" -Details "Gateway is ready"
 }
 
 Invoke-SafeCheck -Name "Create smoke-check member" -Action {

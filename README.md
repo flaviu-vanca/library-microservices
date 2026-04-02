@@ -118,7 +118,7 @@ Module summary:
 - `library-service/`: library/book APIs plus inventory lookup client
 - `inventory-service/`: inventory APIs and stock operations
 - `config-repo/`: externalized YAML config consumed by Config Server
-- `scripts/`: MySQL initialization scripts with sample data
+- `scripts/`: MySQL bootstrap SQL plus `demo-check.ps1` for pre-demo verification
 
 ## 🚀 Quick Start
 
@@ -254,8 +254,11 @@ client -> gateway-service -> library-service -> inventory-service
   - `config-repo/gateway-service.yml`
 - The Config Server uses the `native` profile and reads from the local filesystem
 - Database bootstrap scripts:
+  - `scripts/init-auth-db.sql`
   - `scripts/init-library-db.sql`
   - `scripts/init-inventory-db.sql`
+- Pre-demo smoke check:
+  - `scripts/demo-check.ps1`
 
 Sample data is already inserted for multiple libraries, a larger seeded catalog, and inventory across multiple branches. The currently verified demo record is:
 

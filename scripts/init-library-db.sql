@@ -42,6 +42,8 @@ FROM (
     SELECT 'TUS Athlone Library', 'Dublin Road', 'Athlone', 'Ireland'
     UNION ALL
     SELECT 'Dublin City Library', 'Pearse Street', 'Dublin', 'Ireland'
+    UNION ALL
+    SELECT 'Dublin Central Library', 'Parnell Square', 'Dublin', 'Ireland'
 ) seed
 LEFT JOIN libraries existing ON existing.name = seed.name
 WHERE existing.id IS NULL;

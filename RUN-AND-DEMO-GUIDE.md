@@ -321,7 +321,7 @@ curl -Method Post -Uri "http://localhost:8085/auth/login" `
 **Solution:** This is normal - use the correct endpoint:
 ```powershell
 curl http://localhost:8888/library-service/default
-curl http://localhost:8888/actuator/health
+curl http://localhost:8888/actuator/health/readiness
 ```
 
 ---
@@ -1098,7 +1098,7 @@ Show that the gateway exposes a real member-facing browser UI on top of the prot
 
 ## Before You Start
 
-Run the smoke check first:
+After the stack is up and `docker compose ps` shows the core services as `healthy`, run the smoke check:
 
 ```powershell
 .\scripts\demo-check.ps1
