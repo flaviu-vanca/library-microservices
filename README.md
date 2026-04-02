@@ -97,9 +97,7 @@ Gateway routes:
 .
 ├── pom.xml
 ├── docker-compose.yml
-├── HOW-TO-RUN.md
-├── DEMO-API-GUIDE.md
-├── DEMO-UI-GUIDE.md
+├── RUN-AND-DEMO-GUIDE.md
 ├── config-repo/
 ├── scripts/
 ├── discovery-server/
@@ -288,9 +286,7 @@ Useful endpoints:
 
 Detailed project docs already in the repo:
 
-- [`HOW-TO-RUN.md`](./HOW-TO-RUN.md): startup, commands, troubleshooting
-- [`DEMO-API-GUIDE.md`](./DEMO-API-GUIDE.md): Swagger/API-led demo workflow
-- [`DEMO-UI-GUIDE.md`](./DEMO-UI-GUIDE.md): browser/UI-led demo workflow
+- [`RUN-AND-DEMO-GUIDE.md`](./RUN-AND-DEMO-GUIDE.md): startup, API demo flow, and browser demo flow in one combined guide
 - [`docs/architecture/README.md`](./docs/architecture/README.md): architecture diagrams and source assets
 - [`docs/architecture/SECURITY-ARCHITECTURE-AND-STORAGE.md`](./docs/architecture/SECURITY-ARCHITECTURE-AND-STORAGE.md): security boundaries and storage design notes
 
