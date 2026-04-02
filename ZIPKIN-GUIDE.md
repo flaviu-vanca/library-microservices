@@ -152,7 +152,9 @@ Make sure the app is running:
 docker compose ps
 ```
 
-For the cleanest demo, wait until the main services show `healthy`, then confirm:
+For the cleanest demo, you can still inspect `docker compose ps`, but the smoke check now waits for the stack automatically and prints live readiness progress as each service comes online.
+
+If you want to confirm the gateway by hand as well:
 
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:8085/actuator/health/readiness"
@@ -176,6 +178,19 @@ You can also run the existing smoke check:
 
 ```powershell
 .\scripts\demo-check.ps1
+```
+
+What it does now:
+
+- shows a spinner while the stack is still starting
+- prints `[OK]` as Discovery, Config, Auth, both Library replicas, Inventory, Gateway, and Zipkin become healthy
+- only starts the happy-path checks after the stack is ready
+- reuses `demo-check@library.local` by default, so reruns do not create endless throwaway users
+
+Optional tuning:
+
+```powershell
+.\scripts\demo-check.ps1 -StartupTimeoutSeconds 420 -PollIntervalSeconds 2
 ```
 
 ## 6. Important Note About Zipkin Storage

@@ -97,7 +97,7 @@ Gateway routes:
 .
 ├── pom.xml
 ├── docker-compose.yml
-├── RUN-AND-DEMO-GUIDE.md
+├── ZIPKIN-GUIDE.md
 ├── config-repo/
 ├── scripts/
 ├── discovery-server/
@@ -118,7 +118,7 @@ Module summary:
 - `library-service/`: library/book APIs plus inventory lookup client
 - `inventory-service/`: inventory APIs and stock operations
 - `config-repo/`: externalized YAML config consumed by Config Server
-- `scripts/`: MySQL bootstrap SQL plus `demo-check.ps1` for pre-demo verification
+- `scripts/`: MySQL bootstrap SQL plus `demo-check.ps1` for pre-demo verification with live stack polling
 
 ## 🚀 Quick Start
 
@@ -158,7 +158,7 @@ curl http://localhost:8761/eureka/apps
 curl http://localhost:8085/actuator/health/readiness
 ```
 
-The Compose stack now uses readiness probes and `depends_on: condition: service_healthy`. `.\scripts\demo-check.ps1` is a point-in-time smoke check, not a readiness poller, so run it after the core services already show `healthy`.
+The Compose stack now uses readiness probes and `depends_on: condition: service_healthy`. `.\scripts\demo-check.ps1` now waits for the stack, shows live startup progress, and then runs the happy-path smoke checks. The script reuses a dedicated smoke-check member account by default, so it is safe to rerun without creating a new demo user every time. If you want to tune the wait behavior, use `-StartupTimeoutSeconds` and `-PollIntervalSeconds`.
 
 Useful URLs:
 
@@ -261,6 +261,7 @@ client -> gateway-service -> library-service -> inventory-service
   - `scripts/init-inventory-db.sql`
 - Pre-demo smoke check:
   - `scripts/demo-check.ps1`
+  - optional tuning: `-StartupTimeoutSeconds` and `-PollIntervalSeconds`
 
 Sample data is already inserted for multiple libraries, a larger seeded catalog, and inventory across multiple branches. The currently verified demo record is:
 
@@ -296,7 +297,7 @@ Useful endpoints:
 
 Detailed project docs already in the repo:
 
-- [`RUN-AND-DEMO-GUIDE.md`](./RUN-AND-DEMO-GUIDE.md): startup, API demo flow, and browser demo flow in one combined guide
+- [`ZIPKIN-GUIDE.md`](./ZIPKIN-GUIDE.md): practical tracing workflow, Zipkin UI usage, and trace troubleshooting
 - [`docs/architecture/README.md`](./docs/architecture/README.md): architecture diagrams and source assets
 - [`docs/architecture/SECURITY-ARCHITECTURE-AND-STORAGE.md`](./docs/architecture/SECURITY-ARCHITECTURE-AND-STORAGE.md): security boundaries and storage design notes
 
