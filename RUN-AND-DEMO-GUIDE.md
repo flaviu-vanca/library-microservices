@@ -20,7 +20,6 @@ This guide combines the three operational walkthroughs for the project in the re
 
 > ℹ️ **Default gateway URL:** A fresh clone exposes the gateway on `http://localhost:8085`.
 > Copy `.env.example` to `.env` only if you want to override ports or add social login credentials.
-> The repository now includes `.env.dockerhub` configured for the `flaviuvanca` Docker Hub namespace. Update only the tag if you publish a different version.
 
 Optional for local non-Docker builds and tests:
 
@@ -38,14 +37,6 @@ Optional for local non-Docker builds and tests:
 ```powershell
 docker compose up --build -d
 ```
-
-### ▶️ Start Everything From Published Docker Hub Images
-
-```powershell
-docker compose --env-file .env.dockerhub -f docker-compose.dockerhub.yml up -d
-```
-
-Use this after the images have been published to Docker Hub. The stack is now self-contained, so people only need `.env.dockerhub` and `docker-compose.dockerhub.yml`; they do not need the rest of the repository contents.
 
 ### ▶️ Start Everything + Follow Logs
 
@@ -67,44 +58,6 @@ docker compose up --build -d
 docker compose down -v
 docker compose up --build -d
 ```
-
----
-
-## 📦 Publish Application Images to Docker Hub
-
-### 1. Log In to Docker Hub
-
-```powershell
-docker login
-```
-
-### 2. Build and Push the Published Images
-
-```powershell
-.\scripts\publish-docker-images.ps1 -DockerHubNamespace flaviuvanca -ImageTag v1.0.0
-```
-
-This script builds and pushes:
-
-- `discovery-server`
-- `config-server`
-- `auth-service`
-- `library-service`
-- `inventory-service`
-- `gateway-service`
-- `mysql-library`
-- `mysql-inventory`
-- `mysql-auth`
-
-It also generates `.env.dockerhub` at the repository root so the pull-only stack knows which Docker Hub namespace and tag to use.
-
-### 3. Give Consumers the One-Command Start
-
-```powershell
-docker compose --env-file .env.dockerhub -f docker-compose.dockerhub.yml up -d
-```
-
-The Docker Hub compose file uses your published service images, your published seeded MySQL images, and upstream `openzipkin/zipkin:latest`.
 
 ---
 
