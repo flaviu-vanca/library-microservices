@@ -24,6 +24,14 @@ $gatewayReady = $false
 $eurekaReady = $false
 $script:lastLiveLineLength = 0
 
+try {
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [Console]::OutputEncoding = $utf8NoBom
+    $OutputEncoding = $utf8NoBom
+} catch {
+    # Best effort only. Some hosts may ignore console encoding changes.
+}
+
 function Add-Result {
     param(
         [string]$Check,
@@ -53,17 +61,37 @@ function Invoke-SafeCheck {
 }
 
 function Wait-BeforeExit {
-    if ($NoPause -or $Host.Name -ne "ConsoleHost") {
+    if ($NoPause) {
         return
     }
 
     Write-Host ""
-    Write-Host "Press any key to close..." -ForegroundColor DarkGray
 
     try {
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        Start-Sleep -Milliseconds 250
+        while ([Console]::KeyAvailable) {
+            $null = [Console]::ReadKey($true)
+        }
+
+        Write-Host "Press any key to close..." -ForegroundColor DarkGray
+        $null = [Console]::ReadKey($true)
+        return
     } catch {
-        # If key input is unavailable, just return.
+        # Fall through to Read-Host for hosts that do not support Console.ReadKey.
+    }
+
+    try {
+        Write-Host "Press Enter to close..." -ForegroundColor DarkGray
+        [void](Read-Host)
+        return
+    } catch {
+        # Fall through to cmd pause when stdin is unavailable in this host.
+    }
+
+    try {
+        cmd /c pause
+    } catch {
+        # No further fallback is available.
     }
 }
 
@@ -106,14 +134,17 @@ function Get-ExceptionDetail {
 function New-WatchState {
     param(
         [string]$Name,
-        [bool]$Ready,
-        [string]$Detail
+        [string]$Stage,
+        [string]$Detail,
+        [bool]$Display = $true
     )
 
     return [pscustomobject]@{
         Name = $Name
-        Ready = $Ready
+        Stage = $Stage
+        Ready = $Stage -eq "Ready"
         Detail = $Detail
+        Display = $Display
     }
 }
 
@@ -126,12 +157,14 @@ function Test-HealthEndpoint {
     try {
         $health = Invoke-RestMethod -Uri $Uri -TimeoutSec 5
         if ($health.status -eq "UP") {
-            return New-WatchState -Name $Name -Ready $true -Detail "healthy"
+            return New-WatchState -Name $Name -Stage "Ready" -Detail "healthy"
         }
 
-        return New-WatchState -Name $Name -Ready $false -Detail "status=$($health.status)"
+        return New-WatchState -Name $Name -Stage "Starting" -Detail "status=$($health.status)"
     } catch {
-        return New-WatchState -Name $Name -Ready $false -Detail (Get-ExceptionDetail -Exception $_.Exception)
+        $statusCode = Get-StatusCode -Exception $_.Exception
+        $stage = if ($null -ne $statusCode) { "Starting" } else { "Pending" }
+        return New-WatchState -Name $Name -Stage $stage -Detail (Get-ExceptionDetail -Exception $_.Exception)
     }
 }
 
@@ -143,14 +176,112 @@ function Test-HttpEndpoint {
 
     try {
         $null = Invoke-RestMethod -Uri $Uri -TimeoutSec 5
-        return New-WatchState -Name $Name -Ready $true -Detail "reachable"
+        return New-WatchState -Name $Name -Stage "Ready" -Detail "reachable"
     } catch {
-        return New-WatchState -Name $Name -Ready $false -Detail (Get-ExceptionDetail -Exception $_.Exception)
+        $statusCode = Get-StatusCode -Exception $_.Exception
+        $stage = if ($null -ne $statusCode) { "Starting" } else { "Pending" }
+        return New-WatchState -Name $Name -Stage $stage -Detail (Get-ExceptionDetail -Exception $_.Exception)
+    }
+}
+
+function Get-EurekaApplications {
+    $response = Invoke-RestMethod -Uri "$EurekaBaseUrl/eureka/apps" -Headers @{ Accept = "application/json" } -TimeoutSec 5
+    return @($response.applications.application)
+}
+
+function Test-EurekaRegistrationState {
+    param(
+        [object[]]$ServiceStates
+    )
+
+    $requiredReady = @(
+        "Discovery Server",
+        "Config Server",
+        "Auth Service",
+        "Library Service #1",
+        "Library Service #2",
+        "Inventory Service",
+        "Gateway Service"
+    )
+
+    $notReady = @(
+        $requiredReady | Where-Object {
+            $requiredName = $_
+            -not ($ServiceStates | Where-Object { $_.Name -eq $requiredName -and $_.Ready })
+        }
+    )
+
+    if ($notReady.Count -gt 0) {
+        return New-WatchState -Name "Eureka registrations" -Stage "Pending" -Detail ("waiting for " + $notReady[0]) -Display $false
+    }
+
+    try {
+        $applications = Get-EurekaApplications
+        $requiredServices = @("GATEWAY-SERVICE", "LIBRARY-SERVICE", "INVENTORY-SERVICE", "CONFIG-SERVER")
+        $missingServices = @(
+            $requiredServices | Where-Object {
+                $serviceName = $_
+                -not ($applications | Where-Object { $_.name -eq $serviceName })
+            }
+        )
+
+        if ($missingServices.Count -eq 0) {
+            return New-WatchState -Name "Eureka registrations" -Stage "Ready" -Detail "all required services registered" -Display $false
+        }
+
+        return New-WatchState -Name "Eureka registrations" -Stage "Starting" -Detail ("waiting for " + ($missingServices -join ", ")) -Display $false
+    } catch {
+        $statusCode = Get-StatusCode -Exception $_.Exception
+        $stage = if ($null -ne $statusCode) { "Starting" } else { "Pending" }
+        return New-WatchState -Name "Eureka registrations" -Stage $stage -Detail (Get-ExceptionDetail -Exception $_.Exception) -Display $false
+    }
+}
+
+function Test-LibraryReplicaState {
+    param(
+        [object[]]$ServiceStates
+    )
+
+    $requiredReady = @(
+        "Discovery Server",
+        "Library Service #1",
+        "Library Service #2"
+    )
+
+    $notReady = @(
+        $requiredReady | Where-Object {
+            $requiredName = $_
+            -not ($ServiceStates | Where-Object { $_.Name -eq $requiredName -and $_.Ready })
+        }
+    )
+
+    if ($notReady.Count -gt 0) {
+        return New-WatchState -Name "Library replicas" -Stage "Pending" -Detail ("waiting for " + $notReady[0]) -Display $false
+    }
+
+    try {
+        $applications = Get-EurekaApplications
+        $libraryApp = $applications | Where-Object { $_.name -eq "LIBRARY-SERVICE" } | Select-Object -First 1
+
+        if (-not $libraryApp) {
+            return New-WatchState -Name "Library replicas" -Stage "Starting" -Detail "waiting for LIBRARY-SERVICE registration" -Display $false
+        }
+
+        $instanceCount = @($libraryApp.instance).Count
+        if ($instanceCount -ge 2) {
+            return New-WatchState -Name "Library replicas" -Stage "Ready" -Detail "$instanceCount replicas registered" -Display $false
+        }
+
+        return New-WatchState -Name "Library replicas" -Stage "Starting" -Detail "$instanceCount/2 replicas registered" -Display $false
+    } catch {
+        $statusCode = Get-StatusCode -Exception $_.Exception
+        $stage = if ($null -ne $statusCode) { "Starting" } else { "Pending" }
+        return New-WatchState -Name "Library replicas" -Stage $stage -Detail (Get-ExceptionDetail -Exception $_.Exception) -Display $false
     }
 }
 
 function Get-StackStates {
-    return @(
+    $serviceStates = @(
         (Test-HealthEndpoint -Name "Discovery Server" -Uri "$EurekaBaseUrl/actuator/health/readiness"),
         (Test-HealthEndpoint -Name "Config Server" -Uri "$ConfigServerBaseUrl/actuator/health/readiness"),
         (Test-HealthEndpoint -Name "Auth Service" -Uri "$AuthBaseUrl/actuator/health/readiness"),
@@ -159,6 +290,14 @@ function Get-StackStates {
         (Test-HealthEndpoint -Name "Inventory Service" -Uri "$InventoryBaseUrl/actuator/health/readiness"),
         (Test-HealthEndpoint -Name "Gateway Service" -Uri "$GatewayBaseUrl/actuator/health/readiness"),
         (Test-HttpEndpoint -Name "Zipkin" -Uri "$ZipkinBaseUrl/api/v2/services")
+    )
+
+    return @(
+        $serviceStates +
+        @(
+            (Test-EurekaRegistrationState -ServiceStates $serviceStates),
+            (Test-LibraryReplicaState -ServiceStates $serviceStates)
+        )
     )
 }
 
@@ -171,11 +310,21 @@ function Write-LiveLine {
 }
 
 function Clear-LiveLine {
-    if ($script:lastLiveLineLength -le 0) {
+    $clearWidth = $script:lastLiveLineLength
+
+    try {
+        if ($null -ne $Host.UI -and $null -ne $Host.UI.RawUI) {
+            $clearWidth = [Math]::Max($clearWidth, $Host.UI.RawUI.WindowSize.Width - 1)
+        }
+    } catch {
+        # Fall back to tracked line length only.
+    }
+
+    if ($clearWidth -le 0) {
         return
     }
 
-    Write-Host "`r$(' ' * $script:lastLiveLineLength)`r" -NoNewline
+    Write-Host "`r$(' ' * $clearWidth)`r" -NoNewline
     $script:lastLiveLineLength = 0
 }
 
@@ -185,13 +334,31 @@ function Format-Elapsed {
     return "{0:mm\:ss}" -f $Elapsed
 }
 
+function Format-ServiceList {
+    param(
+        [object[]]$States,
+        [int]$MaxItems = 3
+    )
+
+    if ($null -eq $States -or $States.Count -eq 0) {
+        return ""
+    }
+
+    $names = @($States | Select-Object -First $MaxItems -ExpandProperty Name)
+    if ($States.Count -gt $MaxItems) {
+        return ($names -join ", ") + " +" + ($States.Count - $MaxItems) + " more"
+    }
+
+    return $names -join ", "
+}
+
 function Wait-ForStackHealth {
     param(
         [int]$TimeoutSeconds,
         [int]$PollIntervalSeconds
     )
 
-    $spinnerFrames = @("|", "/", "-", "\")
+    $spinnerFrames = @([string][char]0x231B, [string][char]0x23F3)
     $spinnerIndex = 0
     $announcedReady = @{}
     $start = Get-Date
@@ -204,13 +371,18 @@ function Wait-ForStackHealth {
 
         if ($now -ge $nextPollAt) {
             $states = Get-StackStates
+            $readyNames = [System.Collections.Generic.List[string]]::new()
 
-            foreach ($state in $states) {
-                if ($state.Ready -and -not $announcedReady.ContainsKey($state.Name)) {
-                    Clear-LiveLine
-                    Write-Host ("[OK] {0} is healthy" -f $state.Name) -ForegroundColor Green
+            foreach ($state in ($states | Where-Object { $_.Display })) {
+                if ($state.Stage -eq "Ready" -and -not $announcedReady.ContainsKey($state.Name)) {
+                    $readyNames.Add($state.Name) | Out-Null
                     $announcedReady[$state.Name] = $true
                 }
+            }
+
+            if ($readyNames.Count -gt 0) {
+                Clear-LiveLine
+                Write-Host ("[OK] Ready: {0}" -f (Format-ServiceList -States ($states | Where-Object { $readyNames -contains $_.Name }) -MaxItems 4)) -ForegroundColor Green
             }
 
             if (@($states | Where-Object { $_.Ready }).Count -eq $states.Count) {
@@ -222,23 +394,24 @@ function Wait-ForStackHealth {
             $nextPollAt = $now.AddSeconds($PollIntervalSeconds)
         }
 
-        $readyCount = @($states | Where-Object { $_.Ready }).Count
-        $pendingStates = @($states | Where-Object { -not $_.Ready })
-        $pendingNames = @($pendingStates | Select-Object -First 3 -ExpandProperty Name)
-        $pendingSummary = if ($pendingNames.Count -eq 0) {
-            "finalizing"
-        } elseif ($pendingStates.Count -gt 3) {
-            ($pendingNames -join ", ") + " +" + ($pendingStates.Count - 3) + " more"
+        $startingStates = @($states | Where-Object { $_.Display -and $_.Stage -eq "Starting" })
+        $pendingStates = @($states | Where-Object { $_.Display -and $_.Stage -eq "Pending" })
+        $hiddenStartingStates = @($states | Where-Object { -not $_.Display -and $_.Stage -eq "Starting" })
+        $hiddenPendingStates = @($states | Where-Object { -not $_.Display -and $_.Stage -eq "Pending" })
+
+        $statusText = if ($startingStates.Count -gt 0) {
+            "Finalizing: " + (Format-ServiceList -States $startingStates)
+        } elseif ($pendingStates.Count -gt 0) {
+            "Waiting: " + (Format-ServiceList -States $pendingStates)
+        } elseif ($hiddenStartingStates.Count -gt 0 -or $hiddenPendingStates.Count -gt 0) {
+            "Finalizing: service discovery"
         } else {
-            $pendingNames -join ", "
+            "Finalizing startup checks"
         }
 
-        $line = "[{0}] Waiting for stack health ({1}/{2}) elapsed {3} - pending: {4}" -f `
+        $line = "{0} {1}" -f `
             $spinnerFrames[$spinnerIndex % $spinnerFrames.Count], `
-            $readyCount, `
-            $states.Count, `
-            (Format-Elapsed -Elapsed ((Get-Date) - $start)), `
-            $pendingSummary
+            $statusText
 
         Write-LiveLine -Text $line
         $spinnerIndex++
@@ -254,7 +427,13 @@ function Wait-ForStackHealth {
     $states |
         Select-Object `
             @{Name = "Service"; Expression = { $_.Name } }, `
-            @{Name = "Status"; Expression = { if ($_.Ready) { "UP" } else { "WAIT" } } }, `
+            @{Name = "Status"; Expression = {
+                switch ($_.Stage) {
+                    "Ready" { "UP" }
+                    "Starting" { "STARTING" }
+                    default { "WAIT" }
+                }
+            } }, `
             @{Name = "Details"; Expression = { $_.Detail } } |
         Format-Table -AutoSize
 
