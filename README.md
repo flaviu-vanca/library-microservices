@@ -131,7 +131,12 @@ Optional for local non-Docker work:
 - Java 23+
 - Maven 3.9+
 
-The checked-in defaults already expose the gateway on `http://localhost:8085`. You only need a local `.env` file if you want to override ports or configure social login credentials.
+The checked-in Compose defaults are enough for a fresh clone to run without creating a `.env` file. By default, the gateway is exposed on `http://localhost:8085`.
+
+Create a local `.env` file only if you want to override the default host ports or add your own social login credentials. The intended flow is:
+
+- fresh clone -> `docker compose up --build -d`
+- optional `.env` -> local overrides only
 
 ### ▶️ Build and Run Everything
 
