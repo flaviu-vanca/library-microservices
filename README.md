@@ -158,7 +158,7 @@ curl http://localhost:8761/eureka/apps
 curl http://localhost:8085/actuator/health/readiness
 ```
 
-The Compose stack now uses readiness probes and `depends_on: condition: service_healthy`. `.\scripts\demo-check.ps1` now waits for the stack, shows live startup progress, and then runs the happy-path smoke checks. The script reuses a dedicated smoke-check member account by default, so it is safe to rerun without creating a new demo user every time. If you want to tune the wait behavior, use `-StartupTimeoutSeconds` and `-PollIntervalSeconds`.
+The Compose stack now uses readiness probes and `depends_on: condition: service_healthy`. `.\scripts\demo-check.ps1` waits for container readiness, then also waits for service discovery to settle before it starts the happy-path smoke checks. That means you may briefly see `Finalizing: service discovery` even after the gateway readiness endpoint is already `UP`; this is expected while Eureka registrations and the second `LIBRARY-SERVICE` replica finish converging. The script reuses a dedicated smoke-check member account by default, so it is safe to rerun without creating a new demo user every time. If you want to tune the wait behavior, use `-StartupTimeoutSeconds` and `-PollIntervalSeconds`.
 
 Useful URLs:
 
@@ -261,6 +261,7 @@ client -> gateway-service -> library-service -> inventory-service
   - `scripts/init-inventory-db.sql`
 - Pre-demo smoke check:
   - `scripts/demo-check.ps1`
+  - validates Eureka registrations and both `LIBRARY-SERVICE` replicas before the business-flow checks begin
   - optional tuning: `-StartupTimeoutSeconds` and `-PollIntervalSeconds`
 
 Sample data is already inserted for multiple libraries, a larger seeded catalog, and inventory across multiple branches. The currently verified demo record is:
@@ -308,4 +309,4 @@ Automated module-level tests are present in the repository:
 - `library-service`: `BookRepositoryTest` and `BookServiceTest` (`11` tests)
 - `gateway-service`: `RequiredServicesHealthIndicatorTest` (`2` tests)
 
-The docs still describe manual verification for the distributed happy path because there is no end-to-end automated test that covers `gateway-service -> library-service -> inventory-service`.
+Local distributed verification is covered by `scripts/demo-check.ps1`, which exercises the current happy path against the running stack. There is still no separate application-level CI end-to-end test suite covering `gateway-service -> library-service -> inventory-service`.

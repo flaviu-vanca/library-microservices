@@ -162,6 +162,12 @@ Invoke-RestMethod -Uri "http://localhost:8085/actuator/health/readiness"
 
 The gateway readiness payload should report `requiredServices` as `UP`.
 
+That hand check is useful, but it is not the whole startup story. The smoke
+check also waits for Eureka registrations and both `LIBRARY-SERVICE` replicas
+to settle. If the script briefly shows `Finalizing: service discovery` after
+the gateway health endpoint is already `UP`, that is expected and means the
+stack is still converging in discovery rather than the gateway being broken.
+
 If the stack is not running:
 
 ```powershell
@@ -184,6 +190,7 @@ What it does now:
 
 - shows a spinner while the stack is still starting
 - prints `[OK]` as Discovery, Config, Auth, both Library replicas, Inventory, Gateway, and Zipkin become healthy
+- waits for Eureka registrations and both `LIBRARY-SERVICE` instances before running the business-flow checks
 - only starts the happy-path checks after the stack is ready
 - reuses `demo-check@library.local` by default, so reruns do not create endless throwaway users
 
