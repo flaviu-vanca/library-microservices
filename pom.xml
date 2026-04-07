@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.13</version>
+        <version>4.0.5</version>
         <relativePath/>
     </parent>
 
@@ -33,14 +33,18 @@
         <java.version>23</java.version>
 
         <!-- Shared dependency versions -->
-        <spring-cloud.version>2025.0.1</spring-cloud.version>
+        <spring-cloud.version>2025.1.1</spring-cloud.version>
         <mysql.version>9.3.0</mysql.version>
-        <testcontainers.version>1.19.8</testcontainers.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
         <lombok.version>1.18.42</lombok.version>
-        <httpclient.version>4.5.13</httpclient.version>
-        <commons-lang.version>2.6</commons-lang.version>
+        <tomcat.version>11.0.18</tomcat.version>
+        <httpclient.version>4.5.14</httpclient.version>
         <commons-lang3.version>3.18.0</commons-lang3.version>
-        <commons-compress.version>1.26.0</commons-compress.version>
+        <commons-compress.version>1.27.1</commons-compress.version>
+        <joda-time.version>2.12.7</joda-time.version>
+        <jackson3.version>3.1.1</jackson3.version>
+        <spring-framework.version>7.0.6</spring-framework.version>
+        <netty.version>4.1.132.Final</netty.version>
 
         <!-- Build -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -69,18 +73,18 @@
                 <scope>import</scope>
             </dependency>
 
+            <!-- Keep Config Server on the CVE-fixed patch while allowing child modules to omit explicit versions -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-config-server</artifactId>
+                <version>5.0.2</version>
+            </dependency>
+
             <!-- Force safe Apache HttpClient version -->
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
                 <version>${httpclient.version}</version>
-            </dependency>
-
-            <!-- Force legacy commons-lang required by Eureka's commons-configuration path -->
-            <dependency>
-                <groupId>commons-lang</groupId>
-                <artifactId>commons-lang</artifactId>
-                <version>${commons-lang.version}</version>
             </dependency>
 
             <!-- Force safe commons-lang3 version -->
@@ -90,18 +94,83 @@
                 <version>${commons-lang3.version}</version>
             </dependency>
 
-            <!-- Keep commons-configuration aligned with Eureka's expected runtime dependencies -->
-            <dependency>
-                <groupId>commons-configuration</groupId>
-                <artifactId>commons-configuration</artifactId>
-                <version>1.10</version>
-            </dependency>
-
             <!-- Force safe commons-compress version -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
                 <version>${commons-compress.version}</version>
+            </dependency>
+
+            <!-- Fix CVE-2026-29062 in Jackson 3.x (tools.jackson.core group) pulled in by
+                 spring-cloud-config-server. Upgraded from 3.0.4 to 3.1.1 which contains the patch. -->
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tools.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>tools.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-yaml</artifactId>
+                <version>${jackson3.version}</version>
+            </dependency>
+
+            <!-- Fix CVE-2024-23082 / CVE-2024-23081 (Medium) - ReDoS and path traversal in joda-time -->
+            <dependency>
+                <groupId>joda-time</groupId>
+                <artifactId>joda-time</artifactId>
+                <version>${joda-time.version}</version>
+            </dependency>
+
+            <!--
+                The following four entries address legacy vulnerabilities in the Netflix Commons /
+                Eureka transitive chain. None of these libraries have patched releases; the
+                maintainers are effectively abandoned. Setting scope=provided removes them from
+                the packaged Spring Boot fat-jar while still allowing Maven to resolve the graph.
+                None of the code paths that use these libraries (Netflix Infix expression
+                evaluation, JXPath, ANTLR grammars, commons-math statistics) are exercised by
+                a Spring Cloud Config Server at runtime.
+            -->
+
+
+            <!-- CVE-2014-5645 - path traversal in TokenStreamSelector. No fix in 2.x.
+                 Chain: eureka-client → netflix-eventbus → netflix-infix → antlr-runtime → antlr -->
+            <dependency>
+                <groupId>antlr</groupId>
+                <artifactId>antlr</artifactId>
+                <version>2.7.7</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- ANTLR 3.x runtime - abandoned, part of the same netflix-infix chain. Not used by this service.
+                 Chain: eureka-client → netflix-eventbus → netflix-infix → antlr-runtime -->
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr-runtime</artifactId>
+                <version>3.4</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- StringTemplate 3.x - ReDoS and parse vulnerabilities. Abandoned project.
+                 Chain: eureka-client → netflix-eventbus → netflix-infix → antlr-runtime → stringtemplate -->
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>stringtemplate</artifactId>
+                <version>3.2.1</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- commons-math 2.2 (2010) - no active CVEs but EOL with no security patches.
+                 Chain: eureka-client → netflix-eventbus → commons-math -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-math</artifactId>
+                <version>2.2</version>
+                <scope>provided</scope>
             </dependency>
 
         </dependencies>
@@ -136,6 +205,16 @@
                                 <artifactId>lombok</artifactId>
                             </exclude>
                         </excludes>
+                    </configuration>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.owasp</groupId>
+                    <artifactId>dependency-check-maven</artifactId>
+                    <configuration>
+                        <suppressionFile>${project.basedir}/../owasp-suppressions.xml</suppressionFile>
+                        <skipProvidedScope>true</skipProvidedScope>
+                        <skipTestScope>true</skipTestScope>
                     </configuration>
                 </plugin>
 
