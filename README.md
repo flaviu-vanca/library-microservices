@@ -3,8 +3,8 @@
 > Cloud-native library management system built with Spring Boot and Spring Cloud microservices.
 
 [![Java](https://img.shields.io/badge/Java-23-orange?logo=openjdk)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.13-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
-[![Spring Cloud](https://img.shields.io/badge/Spring%20Cloud-2025.0.1-brightgreen?logo=spring)](https://spring.io/projects/spring-cloud)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.5-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
+[![Spring Cloud](https://img.shields.io/badge/Spring%20Cloud-2025.1.1-brightgreen?logo=spring)](https://spring.io/projects/spring-cloud)
 [![Build](https://img.shields.io/badge/Build-Maven-blue?logo=apachemaven)](https://maven.apache.org/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?logo=docker)](https://www.docker.com/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -78,15 +78,15 @@ Two `library-service` replicas register under the same Eureka service ID (`LIBRA
 |---|---|
 | Java | 23 |
 | Maven | 3.9+ |
-| Spring Boot | 3.5.13 |
-| Spring Cloud | 2025.0.1 |
+| Spring Boot | 4.0.5 |
+| Spring Cloud | 2025.1.1 |
 | Spring Cloud Gateway | via Spring Cloud BOM |
 | Resilience4j | via Spring Cloud circuit breaker starter |
 | JJWT | 0.12.6 |
 | MySQL | 8.0.45 |
 | Micrometer Tracing + Zipkin | via Spring Boot BOM |
 | Springdoc OpenAPI | via Spring Boot BOM |
-| Testcontainers | 1.19.8 |
+| Testcontainers | 1.20.4 |
 | Docker / Docker Compose | any current release |
 
 ---
@@ -287,7 +287,9 @@ library-microservices/
 ├── inventory-service/             # Inventory CRUD, reserve / return operations
 │
 └── docs/
-    └── architecture/              # Draw.io sources + exported PNG diagrams
+    └── architecture/              # Architecture documentation
+        ├── drawio/                # Editable Draw.io source files
+        └── img/                   # Exported PNG diagrams
 ```
 
 ---

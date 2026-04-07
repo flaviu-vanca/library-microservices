@@ -64,7 +64,7 @@ This project is already configured to send traces to Zipkin.
 
 ### Zipkin container
 
-In [docker-compose.yml](K:\Semester 2\Microservices Architecture\Assignment #2\library-microservices-cloud-native\docker-compose.yml#L74), Zipkin is run as:
+In [docker-compose.yml](docker-compose.yml), Zipkin is run as:
 
 - service name: `zipkin`
 - image: `openzipkin/zipkin:3.6.0`
@@ -80,7 +80,7 @@ http://localhost:9411
 
 ### Shared tracing configuration
 
-In [application.yml](K:\Semester 2\Microservices Architecture\Assignment #2\library-microservices-cloud-native\config-repo\application.yml#L39), tracing is configured centrally:
+In [config-repo/application.yml](config-repo/application.yml), tracing is configured centrally:
 
 - sampling probability is `1.0`
 - Zipkin endpoint is `http://localhost:9411/api/v2/spans` for host-based local runs
@@ -439,7 +439,7 @@ Then add:
 
 ## 13. Using Zipkin With Logs
 
-This project also writes `traceId` and `spanId` into logs via the shared log pattern in [application.yml](K:\Semester 2\Microservices Architecture\Assignment #2\library-microservices-cloud-native\config-repo\application.yml#L47).
+This project also writes `traceId` and `spanId` into logs via the shared log pattern in [config-repo/application.yml](config-repo/application.yml).
 
 That gives you log-trace correlation.
 
