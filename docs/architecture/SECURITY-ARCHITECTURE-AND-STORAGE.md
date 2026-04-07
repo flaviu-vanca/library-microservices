@@ -3,7 +3,7 @@
 ## Purpose
 
 This document describes the current security architecture, trust boundaries, and
-storage model implemented in `library-microservices-cloud-native`.
+storage model implemented in `library-microservices`.
 
 It covers:
 
@@ -777,7 +777,7 @@ should be:
 
 ## Conclusion
 
-`library-microservices-cloud-native` currently implements a coherent
+`library-microservices` currently implements a coherent
 assignment-grade security architecture built around:
 
 - `auth-service` as the token issuer
