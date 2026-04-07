@@ -3,7 +3,7 @@
 ## Purpose
 
 This document describes the current security architecture, trust boundaries, and
-storage model implemented in `library-microservices`.
+storage model implemented in `library-microservices-cloud-native`.
 
 It covers:
 
@@ -62,7 +62,7 @@ Specifically, `GET /api/books/{id}/availability` reads book metadata from
 
 ### Authentication Model
 
-The current authentication model is JWT-based and is owned by
+The current authentication model is JWT-based and owned by
 `auth-service`.
 
 Auth endpoints exposed under `/auth/**`:
@@ -381,7 +381,7 @@ CSRF is disabled in:
 - `library-service`
 - `inventory-service`
 
-This is consistent with the current stateless bearer-token design.
+This is consistent with the current stateless bearer token design.
 
 It would not be an appropriate default if the browser model changes later to
 cookie-based sessions.
@@ -597,7 +597,7 @@ Operational implication:
 - schema creation is convenient in development
 - schema evolution is less controlled than a migration-based approach
 
-For production-grade operation, explicit migrations would be preferable.
+For production-grade operation, explicit migrations are preferable.
 
 ---
 
@@ -617,7 +617,7 @@ ports:
 - MySQL Library
 - MySQL Inventory
 
-This is reasonable for local development and demonstration.
+This is reasonable for local development and demo use.
 
 For a hardened deployment, the following should be treated as internal-only
 components:
@@ -636,40 +636,18 @@ Relevant configuration:
 
 ## Dependency Security and Supply Chain
 
-### Vulnerability management
+Dependency versions are managed centrally at the root `pom.xml` level through
+`<dependencyManagement>`, and child modules inherit those managed versions.
 
-All dependencies are governed centrally from the root `pom.xml` `<dependencyManagement>` block. No child module may introduce an unmanaged version for a security-relevant library.
+Build plugins are also controlled at the root `pluginManagement` level so shared build
+behavior stays consistent across modules.
 
-Vulnerability scanning uses the OWASP Dependency-Check Maven plugin configured in `pluginManagement`. The plugin is configured to:
+The current project includes dependency and transitive-version governance
+controls to keep module dependencies aligned with the selected Spring Boot and
+Spring Cloud stack.
 
-- skip `provided` and `test` scope artifacts (they are not packaged in deployed artifacts)
-- apply suppression rules from `owasp-suppressions.xml` at the project root
-
-Current scan result: **0 CVEs reported** (verified April 2026).
-
-### Transitive dependency hardening
-
-Several abandoned libraries arrive transitively through `com.netflix.eureka:eureka-client` via the Netflix Commons legacy chain. Because no upstream patches exist for these libraries, they are overridden to `provided` scope in `dependencyManagement`, which excludes them from the packaged Spring Boot fat-jar:
-
-| Library | Chain | Reason |
-|---|---|---|
-| `commons-jxpath:1.3` | `eureka-client → netflix-eventbus → netflix-infix` | CVE-2022-40159/40160 — RCE via untrusted XPath. Abandoned. |
-| `antlr:antlr:2.7.7` | `netflix-infix → antlr-runtime` | CVE-2014-5645 — path traversal. No 2.x fix. |
-| `antlr-runtime:3.4`, `stringtemplate:3.2.1` | `netflix-infix → antlr-runtime` | Abandoned; same chain as above. |
-| `commons-math:2.2` | `netflix-eventbus` | EOL since 2010; no active CVEs but no security patches. |
-
-None of the code paths that exercise these libraries (Netflix Infix expression evaluation, JXPath, ANTLR grammar parsing) are invoked by a Spring Cloud Config Server or Eureka client doing service registration.
-
-### Accepted risks
-
-Two CVEs cannot be patched because the upstream libraries are EOL with no replacement version compatible with `eureka-client`:
-
-| CVE | Artifact | Justification |
-|---|---|---|
-| CVE-2025-46392 | `commons-configuration:1.10` | EOL since 2013. Required by Eureka for internal configuration loading only. Never passed user-supplied input. |
-| CVE-2022-40159/40160 | `commons-jxpath:1.3` | Excluded from runtime jar via `provided` scope. Not reachable in production. |
-
-Both are formally suppressed with documented justification in `owasp-suppressions.xml`.
+Detailed vulnerability tracking is intentionally out of scope for this
+architecture document.
 
 ---
 
@@ -777,7 +755,7 @@ should be:
 
 ## Conclusion
 
-`library-microservices` currently implements a coherent
+`library-microservices-cloud-native` currently implements a coherent
 assignment-grade security architecture built around:
 
 - `auth-service` as the token issuer
