@@ -634,6 +634,45 @@ Relevant configuration:
 
 ---
 
+## Dependency Security and Supply Chain
+
+### Vulnerability management
+
+All dependencies are governed centrally from the root `pom.xml` `<dependencyManagement>` block. No child module may introduce an unmanaged version for a security-relevant library.
+
+Vulnerability scanning uses the OWASP Dependency-Check Maven plugin configured in `pluginManagement`. The plugin is configured to:
+
+- skip `provided` and `test` scope artifacts (they are not packaged in deployed artifacts)
+- apply suppression rules from `owasp-suppressions.xml` at the project root
+
+Current scan result: **0 CVEs reported** (verified April 2026).
+
+### Transitive dependency hardening
+
+Several abandoned libraries arrive transitively through `com.netflix.eureka:eureka-client` via the Netflix Commons legacy chain. Because no upstream patches exist for these libraries, they are overridden to `provided` scope in `dependencyManagement`, which excludes them from the packaged Spring Boot fat-jar:
+
+| Library | Chain | Reason |
+|---|---|---|
+| `commons-jxpath:1.3` | `eureka-client → netflix-eventbus → netflix-infix` | CVE-2022-40159/40160 — RCE via untrusted XPath. Abandoned. |
+| `antlr:antlr:2.7.7` | `netflix-infix → antlr-runtime` | CVE-2014-5645 — path traversal. No 2.x fix. |
+| `antlr-runtime:3.4`, `stringtemplate:3.2.1` | `netflix-infix → antlr-runtime` | Abandoned; same chain as above. |
+| `commons-math:2.2` | `netflix-eventbus` | EOL since 2010; no active CVEs but no security patches. |
+
+None of the code paths that exercise these libraries (Netflix Infix expression evaluation, JXPath, ANTLR grammar parsing) are invoked by a Spring Cloud Config Server or Eureka client doing service registration.
+
+### Accepted risks
+
+Two CVEs cannot be patched because the upstream libraries are EOL with no replacement version compatible with `eureka-client`:
+
+| CVE | Artifact | Justification |
+|---|---|---|
+| CVE-2025-46392 | `commons-configuration:1.10` | EOL since 2013. Required by Eureka for internal configuration loading only. Never passed user-supplied input. |
+| CVE-2022-40159/40160 | `commons-jxpath:1.3` | Excluded from runtime jar via `provided` scope. Not reachable in production. |
+
+Both are formally suppressed with documented justification in `owasp-suppressions.xml`.
+
+---
+
 ## Current Strengths
 
 - Passwords are stored as BCrypt hashes.
