@@ -1,20 +1,31 @@
-# 📚 Library Microservices - Cloud Native
+# Library Microservices (Cloud-Native)
 
-Cloud-native library management system built as a Spring Boot / Spring Cloud multi-module project.
+![Java](https://img.shields.io/badge/Java-23-007396?logo=openjdk&logoColor=white)
+![Spring%20Boot](https://img.shields.io/badge/Spring%20Boot-3.5.13-6DB33F?logo=springboot&logoColor=white)
+![Spring%20Cloud](https://img.shields.io/badge/Spring%20Cloud-2025.0.1-6DB33F?logo=spring&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
+![Security](https://img.shields.io/badge/Security-JWT-000000?logo=jsonwebtokens&logoColor=white)
+![Observability](https://img.shields.io/badge/Tracing-Zipkin-000000)
+![Resilience](https://img.shields.io/badge/Resilience-Resilience4j-4B32C3)
 
-The system demonstrates:
+Cloud-native library management system built with **Spring Boot** and **Spring Cloud** microservices. It showcases service discovery, centralized configuration, API gateway routing, JWT security, resilience patterns, and distributed tracing.
 
-- service discovery with Eureka
-- centralized configuration with Spring Cloud Config
-- gateway-based routing with Spring Cloud Gateway
-- inter-service communication between business services
-- resilience with Resilience4j circuit breaker, retry, and timeout
-- JWT-based API security with role-based access control
-- distributed tracing with Micrometer and Zipkin
+---
 
-## 🌐 Overview
+## Highlights
 
-The repository contains six Spring Boot services:
+- **Service discovery** via **Eureka**
+- **Centralized configuration** with **Spring Cloud Config** (native mode, local `config-repo/`)
+- **API gateway** using **Spring Cloud Gateway** (`lb://SERVICE-NAME` routing)
+- **Authentication & authorization** with **JWT** and role-based access control
+- **Resilience** with **Resilience4j** (circuit breaker, retry, timeouts, fallbacks)
+- **Observability** with **Micrometer Tracing** and **Zipkin**
+- **Swagger/OpenAPI** docs exposed by business services
+
+## Overview
+
+The system is composed of six Spring Boot services plus supporting infrastructure:
 
 ```text
 Client
@@ -30,55 +41,39 @@ Supporting infrastructure:
   - Zipkin
 ```
 
-The business domain is split into:
+**Domain split**
 
-- `library-service`: manages libraries and books
-- `inventory-service`: manages branch-level stock and availability
+- `library-service`: library and book management
+- `inventory-service`: branch-level stock, reservations, and availability
 
-In the default local deployment, Service A is represented by two `library-service`
-containers behind the same Eureka service ID. The gateway still routes through
-`lb://LIBRARY-SERVICE`, but Eureka can now hand traffic to either replica.
+A key cross-service flow is **`GET /api/books/{id}/availability`**:
 
-The main cross-service use case is `GET /api/books/{id}/availability`, where the Library Service fetches book metadata locally and calls the Inventory Service to aggregate stock information.
+1. `library-service` resolves book metadata locally
+2. `library-service` calls `inventory-service` to aggregate stock by branch
 
-## 🏗️ Architecture
+## Architecture
 
 | Component | Port | Responsibility |
 |---|---:|---|
 | Discovery Server | `8761` | Eureka service registry |
-| Config Server | `8888` | Centralized configuration from local `config-repo/` |
-| Gateway Service | `8080` internally, `8085` on this host by default | Main entry point, static member UI, JWT validation, route forwarding |
-| Auth Service | `8084` | Password signup/login, optional OAuth2 login, JWT renewal |
-| Library Service (Instance 1) | `8081` | Library and book CRUD, availability lookup |
-| Library Service (Instance 2) | `8082` on this host, `8081` in-container | Second Service A replica for discovery/load-balancing demos |
-| Inventory Service | `8083` | Inventory CRUD, branch stock, reserve/return operations |
+| Config Server | `8888` | Centralized configuration from `config-repo/` |
+| Gateway Service | `8080` internally, `8085` on this host by default | Entry point, static member UI, JWT validation, route forwarding |
+| Auth Service | `8084` | Signup/login, optional OAuth2 login, token renewal |
+| Library Service (Instance 1) | `8081` | Library/book APIs, availability lookup |
+| Library Service (Instance 2) | `8082` on this host, `8081` in-container | Second `library-service` replica for discovery/load-balancing demos |
+| Inventory Service | `8083` | Inventory APIs, branch stock, reserve/return operations |
 | Zipkin | `9411` | Distributed tracing UI |
 | MySQL Auth | `3308` | `auth_db` |
 | MySQL Library | `3306` | `library_db` |
 | MySQL Inventory | `3307` | `inventory_db` |
 
-Gateway routes:
+**Gateway routes**
 
-- `/api/libraries/**` -> `LIBRARY-SERVICE`
-- `/api/books/**` -> `LIBRARY-SERVICE`
-- `/api/inventory/**` -> `INVENTORY-SERVICE`
+- `/api/libraries/**` → `LIBRARY-SERVICE`
+- `/api/books/**` → `LIBRARY-SERVICE`
+- `/api/inventory/**` → `INVENTORY-SERVICE`
 
-## ✨ Key Features
-
-- Maven multi-module parent project with shared dependency management
-- Config Server running in `native` mode, backed by the local `config-repo/` directory
-- Service registration and discovery through Eureka
-- Gateway-based API routing using `lb://SERVICE-NAME`
-- Resilient Library -> Inventory calls via:
-  - circuit breaker
-  - fail-fast retry
-  - bounded client timeouts and fallback handling
-- JWT security through `auth-service` for password signup/login, optional OAuth2, and token renewal
-- Swagger/OpenAPI docs on `auth-service`, `library-service`, and `inventory-service`
-- Zipkin tracing across gateway and service hops, including the `library-service -> inventory-service` `WebClient` hop
-- Sample MySQL seed data for libraries, books, and inventory
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Technology | Version |
 |---|---|
@@ -87,11 +82,8 @@ Gateway routes:
 | Spring Boot | `3.5.13` |
 | Spring Cloud | `2025.0.1` |
 | MySQL | `8.0.45` |
-| Spring Cloud Gateway | via Spring Cloud BOM |
-| Resilience4j | via Spring Cloud circuit breaker starter |
-| Micrometer Tracing + Zipkin | enabled across services |
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 .
@@ -109,48 +101,41 @@ Gateway routes:
 └── docs/
 ```
 
-Module summary:
+**Module summary**
 
 - `discovery-server/`: Eureka server
 - `config-server/`: Spring Cloud Config server
-- `gateway-service/`: API gateway, static member UI, and JWT validation
-- `auth-service/`: password signup/login, optional OAuth2 login, and JWT renewal
-- `library-service/`: library/book APIs plus inventory lookup client
-- `inventory-service/`: inventory APIs and stock operations
-- `config-repo/`: externalized YAML config consumed by Config Server
-- `scripts/`: MySQL bootstrap SQL plus `demo-check.ps1` for pre-demo verification with live stack polling
+- `gateway-service/`: API gateway + static member UI + JWT validation
+- `auth-service/`: password auth (and optional OAuth2) + token renewal
+- `library-service/`: library/book APIs + inventory lookup client
+- `inventory-service/`: inventory APIs + stock operations
+- `config-repo/`: externalized YAML config consumed by the Config Server
+- `scripts/`: database bootstrap SQL + `demo-check.ps1` startup verification
 
-## 🚀 Quick Start
+## Quick Start
 
-### ✅ Prerequisites
+### Prerequisites
 
-- Docker Desktop / Docker Engine
+- **Docker Desktop / Docker Engine**
 
-Optional for local non-Docker work:
+Optional (non-Docker local development):
 
 - Java 23+
 - Maven 3.9+
 
-The checked-in Compose defaults are enough for a fresh clone to run without creating a `.env` file. By default, the gateway is exposed on `http://localhost:8085`.
+By default, the gateway is exposed at `http://localhost:8085`.
 
-Create a local `.env` file only if you want to override the default host ports or add your own social login credentials. The intended flow is:
-
-- fresh clone -> `docker compose up --build -d`
-- optional `.env` -> local overrides only
-
-### ▶️ Build and Run Everything
-
-From a fresh clone:
+### Build and run
 
 ```powershell
 docker compose up --build -d
 ```
 
-The first run builds the Spring Boot service images from source inside Docker, so it can take a few minutes. Zipkin is still part of the Compose stack, but it is pulled as an external image instead of being built from this repository.
+The first run builds service images from source inside Docker, which may take a few minutes.
 
-If another local app is already using a port, copy `.env.example` to `.env` and adjust the host ports before starting.
+If a local app is already using a port, copy `.env.example` to `.env` and adjust host ports before starting.
 
-### 🔎 Verify Startup
+### Verify startup
 
 ```powershell
 docker compose ps
@@ -158,24 +143,20 @@ curl http://localhost:8761/eureka/apps
 curl http://localhost:8085/actuator/health/readiness
 ```
 
-The Compose stack now uses readiness probes and `depends_on: condition: service_healthy`. `.\scripts\demo-check.ps1` waits for container readiness, then also waits for service discovery to settle before it starts the happy-path smoke checks. That means you may briefly see `Finalizing: service discovery` even after the gateway readiness endpoint is already `UP`; this is expected while Eureka registrations and the second `LIBRARY-SERVICE` replica finish converging. The script reuses a dedicated smoke-check member account by default, so it is safe to rerun without creating a new demo user every time. If you want to tune the wait behavior, use `-StartupTimeoutSeconds` and `-PollIntervalSeconds`.
-
 Useful URLs:
 
-- 🔍 Eureka: `http://localhost:8761`
-- ⚙️ Config Server: `http://localhost:8888`
-- 🚪 Gateway: `http://localhost:8085`
-- 🔐 Auth Swagger: `http://localhost:8084/swagger-ui.html`
-- 📚 Library Swagger: `http://localhost:8081/swagger-ui.html`
-- 📚 Library Swagger (Replica 2): `http://localhost:8082/swagger-ui.html`
-- 📦 Inventory Swagger: `http://localhost:8083/swagger-ui.html`
-- 🔭 Zipkin: `http://localhost:9411`
+- Eureka: `http://localhost:8761`
+- Config Server: `http://localhost:8888`
+- Gateway: `http://localhost:8085`
+- Auth Swagger: `http://localhost:8084/swagger-ui.html`
+- Library Swagger: `http://localhost:8081/swagger-ui.html`
+- Library Swagger (Replica 2): `http://localhost:8082/swagger-ui.html`
+- Inventory Swagger: `http://localhost:8083/swagger-ui.html`
+- Zipkin: `http://localhost:9411`
 
-## 🔐 Authentication
+## Authentication
 
-The gateway now exposes password-based auth endpoints for members:
-
-No auth users are seeded by default. Create a fresh member through `/auth/signup`, or log in only after that account already exists.
+No users are seeded by default. Create a member via `/auth/signup`, then use `/auth/login` as needed.
 
 ```powershell
 $Email = "member-demo-$(Get-Date -Format yyyyMMddHHmmss)@library.local"
@@ -190,9 +171,7 @@ $TOKEN = (Invoke-RestMethod -Method Post -Uri "http://localhost:8085/auth/signup
   -Body $SignupBody).access_token
 ```
 
-Use `/auth/login` with the same email and password after the account exists.
-
-Gateway access rules:
+**Gateway access rules**
 
 | Request Type | Role Required |
 |---|---|
@@ -203,26 +182,16 @@ Gateway access rules:
 | `/auth/**` | public |
 | `/actuator/health/**` | public |
 
-Example:
+Example request:
 
 ```powershell
-$Email = "readme-demo-$(Get-Date -Format yyyyMMddHHmmss)@library.local"
-$SignupBody = @{
-  fullName = "README Demo Member"
-  email = $Email
-  password = "Library123"
-} | ConvertTo-Json
-
-$UserToken = (Invoke-RestMethod -Method Post -Uri "http://localhost:8085/auth/signup" `
-  -ContentType "application/json" `
-  -Body $SignupBody).access_token
-Invoke-RestMethod -Uri "http://localhost:8085/api/libraries" -Headers @{Authorization="Bearer $UserToken"}
+Invoke-RestMethod -Uri "http://localhost:8085/api/libraries" -Headers @{Authorization="Bearer $TOKEN"}
 ```
 
-## 🔄 Example API Flow
+## Example API Flow
 
 ```powershell
-# 1. Create a fresh member and capture a JWT
+# 1) Create a member and capture a JWT
 $Email = "readme-flow-$(Get-Date -Format yyyyMMddHHmmss)@library.local"
 $SignupBody = @{
   fullName = "README Flow Member"
@@ -234,79 +203,55 @@ $UserToken = (Invoke-RestMethod -Method Post -Uri "http://localhost:8085/auth/si
   -ContentType "application/json" `
   -Body $SignupBody).access_token
 
-# 2. Read a seeded book through the gateway
+# 2) Read a seeded book through the gateway
 Invoke-RestMethod -Uri "http://localhost:8085/api/books/1" -Headers @{Authorization="Bearer $UserToken"}
 
-# 3. Query cross-service availability through the gateway
+# 3) Query cross-service availability through the gateway
 Invoke-RestMethod -Uri "http://localhost:8085/api/books/1/availability" -Headers @{Authorization="Bearer $UserToken"}
 ```
 
-This is the main request flow:
+Request flow:
 
 ```text
 client -> gateway-service -> library-service -> inventory-service
 ```
 
-## ⚙️ Configuration and Data
+## Configuration and Data
 
-- Shared defaults live in `config-repo/application.yml`
-- Service-specific config lives in:
+- Shared defaults: `config-repo/application.yml`
+- Service-specific config:
   - `config-repo/library-service.yml`
   - `config-repo/inventory-service.yml`
   - `config-repo/gateway-service.yml`
-- The Config Server uses the `native` profile and reads from the local filesystem
 - Database bootstrap scripts:
   - `scripts/init-auth-db.sql`
   - `scripts/init-library-db.sql`
   - `scripts/init-inventory-db.sql`
-- Pre-demo smoke check:
+- Pre-demo readiness & smoke checks:
   - `scripts/demo-check.ps1`
-  - validates Eureka registrations and both `LIBRARY-SERVICE` replicas before the business-flow checks begin
-  - optional tuning: `-StartupTimeoutSeconds` and `-PollIntervalSeconds`
 
-Sample data is already inserted for multiple libraries, a larger seeded catalog, and inventory across multiple branches. The currently verified demo record is:
+Seeded demo record:
 
-- 📖 Book ID `1`: `Clean Code`
-- 🔢 ISBN: `978-0-13-468599-1`
-- 📦 Availability is populated through `inventory-service`
+- Book ID `1`: `Clean Code`
+- ISBN: `978-0-13-468599-1`
 
-## 📈 Resilience and Observability
+## Resilience and Observability
 
-The `library-service` protects calls to `inventory-service` with a load-balanced, Boot-customized `WebClient` plus Resilience4j:
+`library-service` protects calls to `inventory-service` using a load-balanced `WebClient` plus Resilience4j.
 
-- sliding window size: `10`
-- failure rate threshold: `50%`
-- wait duration in open state: `10s`
-- retry attempts: `1`
-- Reactor Netty connect timeout: `1000ms`
-- Reactor Netty response timeout: `3000ms`
+Common endpoints:
 
-Startup stability is also implemented now:
+- Readiness health: `http://localhost:8085/actuator/health/readiness`
+- Zipkin UI: `http://localhost:9411`
 
-- Docker Compose health checks use `/actuator/health/readiness`
-- service startup ordering uses `depends_on: condition: service_healthy`
-- `gateway-service` readiness includes a custom `requiredServices` indicator, so it is only marked healthy after `AUTH-SERVICE`, `LIBRARY-SERVICE`, and `INVENTORY-SERVICE` are visible in discovery
+## Documentation
 
-Useful endpoints:
+- `ZIPKIN-GUIDE.md`: tracing workflow and troubleshooting
+- `docs/architecture/README.md`: architecture diagrams and sources
+- `docs/architecture/SECURITY-ARCHITECTURE-AND-STORAGE.md`: security boundaries and storage notes
 
-- ❤️ `http://localhost:8085/actuator/health/readiness`
-- ❤️ `http://localhost:8081/actuator/health/readiness`
-- 🔌 `http://localhost:8081/actuator/circuitbreakers` (requires auth)
-- 🔭 `http://localhost:9411`
+## Testing
 
-## 📖 Documentation
-
-Detailed project docs already in the repo:
-
-- [`ZIPKIN-GUIDE.md`](./ZIPKIN-GUIDE.md): practical tracing workflow, Zipkin UI usage, and trace troubleshooting
-- [`docs/architecture/README.md`](./docs/architecture/README.md): architecture diagrams and source assets
-- [`docs/architecture/SECURITY-ARCHITECTURE-AND-STORAGE.md`](./docs/architecture/SECURITY-ARCHITECTURE-AND-STORAGE.md): security boundaries and storage design notes
-
-## 🧪 Testing Status
-
-Automated module-level tests are present in the repository:
-
-- `library-service`: `BookRepositoryTest` and `BookServiceTest` (`11` tests)
-- `gateway-service`: `RequiredServicesHealthIndicatorTest` (`2` tests)
-
-Local distributed verification is covered by `scripts/demo-check.ps1`, which exercises the current happy path against the running stack. There is still no separate application-level CI end-to-end test suite covering `gateway-service -> library-service -> inventory-service`.
+Module-level tests are included:
+- `library-service`: `BookRepositoryTest` and `BookServiceTest`
+- `gateway-service`: `RequiredServicesHealthIndicatorTest`
