@@ -10,7 +10,6 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Resilience4j](https://img.shields.io/badge/Resilience4j-Circuit%20Breaker-orange)](https://resilience4j.readme.io/)
 [![Zipkin](https://img.shields.io/badge/Tracing-Zipkin-brightgreen)](https://zipkin.io/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
@@ -26,7 +25,6 @@
 - [API Reference](#api-reference)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
-- [License](#license)
 
 ---
 
@@ -145,7 +143,7 @@ Or double-click `Run Demo Check.cmd` from Windows Explorer.
 | Service | URL |
 |---|---|
 | Eureka | <http://localhost:8761> |
-| Config Server | <http://localhost:8888> |
+| Config Server API | <http://localhost:8888/library-service/default> |
 | Gateway | <http://localhost:8085> |
 | Auth Swagger | <http://localhost:8084/swagger-ui.html> |
 | Library Swagger (instance 1) | <http://localhost:8081/swagger-ui.html> |
@@ -258,7 +256,7 @@ curl -s http://localhost:8085/api/books/1/availability \
 ## Project Structure
 
 ```text
-library-microservices/
+repo-root/
 ├── pom.xml                        # Parent POM — BOM, shared deps, plugin config
 ├── docker-compose.yml             # Full stack: services + infra + health ordering
 ├── Dockerfile.service             # Multi-stage build for all Spring Boot modules
@@ -299,9 +297,3 @@ library-microservices/
 1. Fork the repository and create a feature branch (`git checkout -b feature/my-change`).
 2. Make your changes and verify them with the existing test suite (`mvn test`) and `scripts/demo-check.ps1` against a running stack.
 3. Open a pull request with a clear description of the change and its motivation.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).

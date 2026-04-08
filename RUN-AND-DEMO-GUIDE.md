@@ -122,7 +122,7 @@ docker compose restart library-service-2
 | Service | URL | Purpose |
 |---------|-----|---------|
 | 🔍 Eureka Dashboard | http://localhost:8761 | Service registry UI |
-| ⚙️ Config Server | http://localhost:8888 | Configuration endpoint |
+| ⚙️ Config Server API | http://localhost:8888/library-service/default | Example configuration endpoint |
 | 🚪 API Gateway | http://localhost:8085 | Main API entry point |
 | 🔐 Auth Service | http://localhost:8084 | Password/OAuth2 auth endpoints |
 | 📚 Library Service (Instance 1) | http://localhost:8081 | Direct access |
