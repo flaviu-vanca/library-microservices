@@ -24,6 +24,29 @@ $gatewayReady = $false
 $eurekaReady = $false
 $script:lastLiveLineLength = 0
 
+$expectedDockerImages = @(
+    "library-microservices/discovery-server:local",
+    "library-microservices/config-server:local",
+    "library-microservices/auth-service:local",
+    "library-microservices/library-service:local",
+    "library-microservices/inventory-service:local",
+    "library-microservices/gateway-service:local"
+)
+
+$expectedDockerContainers = @(
+    "mysql-library",
+    "mysql-inventory",
+    "mysql-auth",
+    "zipkin",
+    "discovery-server",
+    "config-server",
+    "auth-service",
+    "library-service",
+    "library-service-2",
+    "inventory-service",
+    "gateway-service"
+)
+
 try {
     $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
     [Console]::OutputEncoding = $utf8NoBom
@@ -352,6 +375,116 @@ function Format-ServiceList {
     return $names -join ", "
 }
 
+function Test-DockerCliAvailable {
+    return $null -ne (Get-Command docker -ErrorAction SilentlyContinue)
+}
+
+function Get-DockerArtifactState {
+    $imagesFound = [System.Collections.Generic.List[string]]::new()
+    $containersFound = [System.Collections.Generic.List[string]]::new()
+
+    if (-not (Test-DockerCliAvailable)) {
+        return [pscustomobject]@{
+            DockerAvailable = $false
+            ImagesFound = @()
+            ContainersFound = @()
+            ImagesMissing = $expectedDockerImages
+            ContainersMissing = $expectedDockerContainers
+        }
+    }
+
+    foreach ($image in $expectedDockerImages) {
+        docker image inspect $image *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $imagesFound.Add($image) | Out-Null
+        }
+    }
+
+    $containerNames = @(
+        docker ps -a --format "{{.Names}}" 2>$null |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+
+    foreach ($container in $expectedDockerContainers) {
+        if ($containerNames -contains $container) {
+            $containersFound.Add($container) | Out-Null
+        }
+    }
+
+    return [pscustomobject]@{
+        DockerAvailable = $true
+        ImagesFound = @($imagesFound)
+        ContainersFound = @($containersFound)
+        ImagesMissing = @($expectedDockerImages | Where-Object { $imagesFound -notcontains $_ })
+        ContainersMissing = @($expectedDockerContainers | Where-Object { $containersFound -notcontains $_ })
+    }
+}
+
+function Get-DockerProgressStatus {
+    param([object]$DockerState)
+
+    if (-not $DockerState.DockerAvailable) {
+        return "Docker CLI not found. Skipping image/container wait."
+    }
+
+    if ($DockerState.ImagesMissing.Count -gt 0) {
+        $nextImage = ($DockerState.ImagesMissing[0] -split "[:/]")[-2]
+        return "Building local images ($($DockerState.ImagesFound.Count)/$($expectedDockerImages.Count)). Next: $nextImage"
+    }
+
+    if ($DockerState.ContainersMissing.Count -gt 0) {
+        return "Creating containers ($($DockerState.ContainersFound.Count)/$($expectedDockerContainers.Count)). Next: $($DockerState.ContainersMissing[0])"
+    }
+
+    return "Docker images and containers are ready."
+}
+
+function Wait-ForDockerArtifacts {
+    param(
+        [int]$TimeoutSeconds,
+        [int]$PollIntervalSeconds
+    )
+
+    if (-not (Test-DockerCliAvailable)) {
+        Write-Host "[WARN] Docker CLI was not found on PATH. Skipping Docker image/container wait." -ForegroundColor Yellow
+        return $true
+    }
+
+    $start = Get-Date
+    $deadline = $start.AddSeconds($TimeoutSeconds)
+
+    while ((Get-Date) -lt $deadline) {
+        $dockerState = Get-DockerArtifactState
+        $progressPercent = [Math]::Floor((($dockerState.ImagesFound.Count + $dockerState.ContainersFound.Count) / ($expectedDockerImages.Count + $expectedDockerContainers.Count)) * 100)
+        $status = Get-DockerProgressStatus -DockerState $dockerState
+
+        Write-Progress -Activity "Preparing Docker stack" -Status $status -PercentComplete $progressPercent
+
+        if ($dockerState.ImagesMissing.Count -eq 0 -and $dockerState.ContainersMissing.Count -eq 0) {
+            Write-Progress -Activity "Preparing Docker stack" -Completed
+            Write-Host ("[OK] Docker images and containers are ready after {0}." -f (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Green
+            return $true
+        }
+
+        Start-Sleep -Seconds $PollIntervalSeconds
+    }
+
+    $dockerState = Get-DockerArtifactState
+    Write-Progress -Activity "Preparing Docker stack" -Completed
+    Write-Host ("[FAIL] Timed out after {0} waiting for Docker images/containers to be created." -f (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Red
+
+    if ($dockerState.ImagesMissing.Count -gt 0) {
+        Write-Host ("Missing images: {0}" -f ($dockerState.ImagesMissing -join ", ")) -ForegroundColor DarkYellow
+    }
+
+    if ($dockerState.ContainersMissing.Count -gt 0) {
+        Write-Host ("Missing containers: {0}" -f ($dockerState.ContainersMissing -join ", ")) -ForegroundColor DarkYellow
+    }
+
+    Write-Host "Start the stack with 'docker compose up --build -d' and retry once Docker is still running." -ForegroundColor DarkYellow
+    return $false
+}
+
 function Wait-ForStackHealth {
     param(
         [int]$TimeoutSeconds,
@@ -440,6 +573,13 @@ function Wait-ForStackHealth {
     return $false
 }
 
+Write-Host "Checking Docker images and containers..." -ForegroundColor Cyan
+if (-not (Wait-ForDockerArtifacts -TimeoutSeconds $StartupTimeoutSeconds -PollIntervalSeconds $PollIntervalSeconds)) {
+    Wait-BeforeExit
+    exit 1
+}
+
+Write-Host ""
 Write-Host "Watching stack startup..." -ForegroundColor Cyan
 if (-not (Wait-ForStackHealth -TimeoutSeconds $StartupTimeoutSeconds -PollIntervalSeconds $PollIntervalSeconds)) {
     Wait-BeforeExit
