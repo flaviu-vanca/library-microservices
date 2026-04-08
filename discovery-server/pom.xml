@@ -18,7 +18,7 @@
         <!-- Eureka Server -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+            <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
             <exclusions>
                 <exclusion>
                     <groupId>commons-configuration</groupId>
@@ -27,10 +27,6 @@
                 <exclusion>
                     <groupId>commons-lang</groupId>
                     <artifactId>commons-lang</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.netflix.netflix-commons</groupId>
-                    <artifactId>netflix-eventbus</artifactId>
                 </exclusion>
                 <exclusion>
                     <groupId>commons-jxpath</groupId>

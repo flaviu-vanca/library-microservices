@@ -2,11 +2,12 @@ package com.tus.microservices.gateway.health;
 
 import com.tus.microservices.gateway.config.GatewayReadinessProperties;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.cloud.client.DefaultServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -17,7 +18,7 @@ class RequiredServicesHealthIndicatorTest {
     @Test
     void reportsUpWhenAllRequiredServicesHaveInstances() {
         DiscoveryClient discoveryClient = mock(DiscoveryClient.class);
-        GatewayReadinessProperties properties = properties("AUTH-SERVICE", "LIBRARY-SERVICE");
+        GatewayReadinessProperties properties = properties();
 
         when(discoveryClient.getInstances("AUTH-SERVICE")).thenReturn(List.of(instance("AUTH-SERVICE")));
         when(discoveryClient.getInstances("LIBRARY-SERVICE")).thenReturn(List.of(instance("LIBRARY-SERVICE")));
@@ -25,13 +26,13 @@ class RequiredServicesHealthIndicatorTest {
         RequiredServicesHealthIndicator indicator =
             new RequiredServicesHealthIndicator(discoveryClient, properties);
 
-        assertThat(indicator.health().getStatus()).isEqualTo(Status.UP);
+        assertThat(Objects.requireNonNull(indicator.health()).getStatus()).isEqualTo(Status.UP);
     }
 
     @Test
     void reportsDownWhenAnyRequiredServiceIsMissing() {
         DiscoveryClient discoveryClient = mock(DiscoveryClient.class);
-        GatewayReadinessProperties properties = properties("AUTH-SERVICE", "LIBRARY-SERVICE");
+        GatewayReadinessProperties properties = properties();
 
         when(discoveryClient.getInstances("AUTH-SERVICE")).thenReturn(List.of(instance("AUTH-SERVICE")));
         when(discoveryClient.getInstances("LIBRARY-SERVICE")).thenReturn(List.of());
@@ -39,14 +40,14 @@ class RequiredServicesHealthIndicatorTest {
         RequiredServicesHealthIndicator indicator =
             new RequiredServicesHealthIndicator(discoveryClient, properties);
 
-        assertThat(indicator.health().getStatus()).isEqualTo(Status.DOWN);
-        assertThat(indicator.health().getDetails())
+        assertThat(Objects.requireNonNull(indicator.health()).getStatus()).isEqualTo(Status.DOWN);
+        assertThat(Objects.requireNonNull(indicator.health()).getDetails())
             .containsEntry("missingServices", List.of("LIBRARY-SERVICE"));
     }
 
-    private GatewayReadinessProperties properties(String... services) {
+    private GatewayReadinessProperties properties() {
         GatewayReadinessProperties properties = new GatewayReadinessProperties();
-        properties.setRequiredServices(List.of(services));
+        properties.setRequiredServices(List.of(new String[]{"AUTH-SERVICE", "LIBRARY-SERVICE"}));
         return properties;
     }
 

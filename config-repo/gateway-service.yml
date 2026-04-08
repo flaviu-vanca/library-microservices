@@ -10,56 +10,58 @@ spring:
     name: gateway-service
   cloud:
     gateway:
-      # Enable service discovery routing
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
+      server:
+        webflux:
+          # Enable service discovery routing
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
 
-      # Explicit route definitions
-      routes:
-        # Auth Service Routes
-        - id: auth-service
-          uri: lb://AUTH-SERVICE
-          predicates:
-            - Path=/auth/**
+          # Explicit route definitions
+          routes:
+            # Auth Service Routes
+            - id: auth-service
+              uri: lb://AUTH-SERVICE
+              predicates:
+                - Path=/auth/**
 
-        # Library Service Routes
-        - id: library-service
-          uri: lb://LIBRARY-SERVICE
-          predicates:
-            - Path=/api/libraries/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: libraryCircuitBreaker
-                fallbackUri: forward:/fallback/library
+            # Library Service Routes
+            - id: library-service
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api/libraries/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: libraryCircuitBreaker
+                    fallbackUri: forward:/fallback/library
 
-        - id: library-books-service
-          uri: lb://LIBRARY-SERVICE
-          predicates:
-            - Path=/api/books/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: libraryCircuitBreaker
-                fallbackUri: forward:/fallback/library
+            - id: library-books-service
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api/books/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: libraryCircuitBreaker
+                    fallbackUri: forward:/fallback/library
 
-        # Inventory Service Routes
-        - id: inventory-service
-          uri: lb://INVENTORY-SERVICE
-          predicates:
-            - Path=/api/inventory/**
-          filters:
-            - name: CircuitBreaker
-              args:
-                name: inventoryCircuitBreaker
-                fallbackUri: forward:/fallback/inventory
+            # Inventory Service Routes
+            - id: inventory-service
+              uri: lb://INVENTORY-SERVICE
+              predicates:
+                - Path=/api/inventory/**
+              filters:
+                - name: CircuitBreaker
+                  args:
+                    name: inventoryCircuitBreaker
+                    fallbackUri: forward:/fallback/inventory
 
-      # Default filters applied to all routes
-      default-filters:
-        # Relay JWT token to downstream services
-        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+          # Default filters applied to all routes
+          default-filters:
+            # Relay JWT token to downstream services
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
 
 # Resilience4j for Gateway Circuit Breakers
 resilience4j:

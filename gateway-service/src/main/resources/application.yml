@@ -8,27 +8,29 @@ spring:
   config:
     import: optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}
   cloud:
-    # Gateway routes - these can also be loaded from Config Server
     gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-      routes:
-        - id: auth-service
-          uri: lb://AUTH-SERVICE
-          predicates:
-            - Path=/auth/**
+      server:
+        webflux:
+          # Gateway routes - these can also be loaded from Config Server
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+          routes:
+            - id: auth-service
+              uri: lb://AUTH-SERVICE
+              predicates:
+                - Path=/auth/**
 
-        - id: library-service
-          uri: lb://LIBRARY-SERVICE
-          predicates:
-            - Path=/api/libraries/**, /api/books/**
+            - id: library-service
+              uri: lb://LIBRARY-SERVICE
+              predicates:
+                - Path=/api/libraries/**, /api/books/**
 
-        - id: inventory-service
-          uri: lb://INVENTORY-SERVICE
-          predicates:
-            - Path=/api/inventory/**
+            - id: inventory-service
+              uri: lb://INVENTORY-SERVICE
+              predicates:
+                - Path=/api/inventory/**
 
 # Eureka client
 eureka:
@@ -54,8 +56,6 @@ management:
           include: readinessState,clientConfigServer,discoveryComposite,requiredServices,diskSpace,ping,refreshScope
         liveness:
           include: livenessState
-    gateway:
-      enabled: true
   health:
     readinessstate:
       enabled: true
@@ -79,7 +79,6 @@ logging:
 # Local fallback for early startup before Config Server is reachable.
 jwt:
   secret: ${JWT_SECRET:mySecretKeyForJWTTokenGenerationMustBeAtLeast256BitsLong123456789}
-  expiration: ${JWT_EXPIRATION:1800000}
 
 gateway:
   readiness:
