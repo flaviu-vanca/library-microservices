@@ -13,6 +13,7 @@ param(
     [string]$SmokeCheckPassword = "Library123",
     [string]$SmokeCheckFullName = "Smoke Check Member",
     [ValidateRange(10, 3600)][int]$StartupTimeoutSeconds = 300,
+    [ValidateRange(5, 300)][int]$NoProgressTimeoutSeconds = 120,
     [ValidateRange(1, 60)][int]$PollIntervalSeconds = 3,
     [switch]$NoPause
 )
@@ -24,6 +25,7 @@ $gatewayReady = $false
 $eurekaReady = $false
 $script:lastLiveLineLength = 0
 $script:stackName = Split-Path -Leaf (Split-Path -Parent $PSScriptRoot)
+$script:autoCloseSeconds = $null
 
 $expectedDockerImages = @(
     "library-microservices/discovery-server:local",
@@ -85,6 +87,13 @@ function Invoke-SafeCheck {
 }
 
 function Wait-BeforeExit {
+    if ($null -ne $script:autoCloseSeconds -and $script:autoCloseSeconds -gt 0) {
+        Write-Host ""
+        Write-Host ("Closing in {0} seconds..." -f $script:autoCloseSeconds) -ForegroundColor DarkGray
+        Start-Sleep -Seconds $script:autoCloseSeconds
+        return
+    }
+
     if ($NoPause) {
         return
     }
@@ -117,6 +126,14 @@ function Wait-BeforeExit {
     } catch {
         # No further fallback is available.
     }
+}
+
+trap {
+    Clear-LiveLine
+    Write-Host ""
+    Write-Host ("[FAIL] Unexpected error: {0}" -f $_.Exception.Message) -ForegroundColor Red
+    Wait-BeforeExit
+    exit 1
 }
 
 function Get-StatusCode {
@@ -380,6 +397,29 @@ function Test-DockerCliAvailable {
     return $null -ne (Get-Command docker -ErrorAction SilentlyContinue)
 }
 
+function Invoke-DockerCommandQuietly {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments
+    )
+
+    $previousNativeErrorPreference = $null
+    $restoreNativeErrorPreference = $false
+
+    if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+        $previousNativeErrorPreference = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+        $restoreNativeErrorPreference = $true
+    }
+
+    try {
+        & docker @Arguments 2>$null
+    } finally {
+        if ($restoreNativeErrorPreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativeErrorPreference
+        }
+    }
+}
+
 function Get-DockerArtifactState {
     $imagesFound = [System.Collections.Generic.List[string]]::new()
     $containersFound = [System.Collections.Generic.List[string]]::new()
@@ -395,14 +435,22 @@ function Get-DockerArtifactState {
     }
 
     foreach ($image in $expectedDockerImages) {
-        docker image inspect $image *> $null
-        if ($LASTEXITCODE -eq 0) {
+        $imageExists = $false
+
+        try {
+            Invoke-DockerCommandQuietly -Arguments @("image", "inspect", $image) | Out-Null
+            $imageExists = ($LASTEXITCODE -eq 0)
+        } catch {
+            $imageExists = $false
+        }
+
+        if ($imageExists) {
             $imagesFound.Add($image) | Out-Null
         }
     }
 
     $containerNames = @(
-        docker ps -a --format "{{.Names}}" 2>$null |
+        Invoke-DockerCommandQuietly -Arguments @("ps", "-a", "--format", "{{.Names}}") |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
 
@@ -430,6 +478,7 @@ function Get-DockerImageDisplayName {
 function Wait-ForDockerArtifacts {
     param(
         [int]$TimeoutSeconds,
+        [int]$NoProgressTimeoutSeconds,
         [int]$PollIntervalSeconds
     )
 
@@ -440,8 +489,35 @@ function Wait-ForDockerArtifacts {
 
     $start = Get-Date
     $deadline = $start.AddSeconds($TimeoutSeconds)
+    $lastProgressAt = $start
+    $progressStartAt = $null
     $waitingMessageShown = $false
     $announcedDockerReady = @{}
+    $baselineDockerState = Get-DockerArtifactState
+
+    $existingImageNames = [System.Collections.Generic.List[string]]::new()
+    foreach ($image in $baselineDockerState.ImagesFound) {
+        $existingImageNames.Add((Get-DockerImageDisplayName -Image $image)) | Out-Null
+        $announcedDockerReady[$image] = $true
+    }
+
+    $existingContainerNames = [System.Collections.Generic.List[string]]::new()
+    foreach ($container in $baselineDockerState.ContainersFound) {
+        $existingContainerNames.Add($container) | Out-Null
+        $announcedDockerReady["container::$container"] = $true
+    }
+
+    if ($existingImageNames.Count -gt 0) {
+        $label = if ($existingImageNames.Count -eq 1) { "Cached Image Found" } else { "Cached Images Found" }
+        Write-Host ("[INFO] {0}: {1}" -f $label, (($existingImageNames | ForEach-Object { $_ }) -join ", ")) -ForegroundColor DarkGray
+        $lastProgressAt = Get-Date
+    }
+
+    if ($existingContainerNames.Count -gt 0) {
+        $label = if ($existingContainerNames.Count -eq 1) { "Existing Container Found" } else { "Existing Containers Found" }
+        Write-Host ("[INFO] {0}: {1}" -f $label, (($existingContainerNames | ForEach-Object { $_ }) -join ", ")) -ForegroundColor DarkGray
+        $lastProgressAt = Get-Date
+    }
 
     while ((Get-Date) -lt $deadline) {
         $dockerState = Get-DockerArtifactState
@@ -465,18 +541,27 @@ function Wait-ForDockerArtifacts {
         }
 
         if ($newImageNames.Count -gt 0) {
+            if ($null -eq $progressStartAt) {
+                $progressStartAt = Get-Date
+            }
             $label = if ($newImageNames.Count -eq 1) { "Image Ready" } else { "Images Ready" }
             Write-Host ("[OK] {0}: {1}" -f $label, (($newImageNames | ForEach-Object { $_ }) -join ", ")) -ForegroundColor Green
+            $lastProgressAt = Get-Date
         }
 
         if ($newContainerNames.Count -gt 0) {
+            if ($null -eq $progressStartAt) {
+                $progressStartAt = Get-Date
+            }
             $label = if ($newContainerNames.Count -eq 1) { "Container Ready" } else { "Containers Ready" }
             Write-Host ("[OK] {0}: {1}" -f $label, (($newContainerNames | ForEach-Object { $_ }) -join ", ")) -ForegroundColor Green
+            $lastProgressAt = Get-Date
         }
 
         if ($dockerState.ImagesMissing.Count -eq 0 -and $dockerState.ContainersMissing.Count -eq 0) {
             if ($waitingMessageShown) {
-                Write-Host ("[OK] Stack Ready: {0} is ready after {1}." -f $script:stackName, (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Green
+                $elapsedStart = if ($null -ne $progressStartAt) { $progressStartAt } else { $start }
+                Write-Host ("[OK] Stack Ready: {0} is ready after {1}." -f $script:stackName, (Format-Elapsed -Elapsed ((Get-Date) - $elapsedStart))) -ForegroundColor Green
             }
             return $true
         }
@@ -486,11 +571,28 @@ function Wait-ForDockerArtifacts {
             $waitingMessageShown = $true
         }
 
+        if (((Get-Date) - $lastProgressAt).TotalSeconds -ge $NoProgressTimeoutSeconds) {
+            Write-Host ("[FAIL] No Docker startup progress detected for {0}. Stopping early." -f (Format-Elapsed -Elapsed ((Get-Date) - $lastProgressAt))) -ForegroundColor Red
+            $script:autoCloseSeconds = 5
+
+            if ($dockerState.ImagesMissing.Count -gt 0) {
+                Write-Host ("Still missing images: {0}" -f ($dockerState.ImagesMissing -join ", "))
+            }
+
+            if ($dockerState.ContainersMissing.Count -gt 0) {
+                Write-Host ("Still missing containers: {0}" -f ($dockerState.ContainersMissing -join ", "))
+            }
+
+            Write-Host "Start the stack with 'docker compose up --build -d' and retry once Docker is still running."
+            return $false
+        }
+
         Start-Sleep -Seconds $PollIntervalSeconds
     }
 
     $dockerState = Get-DockerArtifactState
     Write-Host ("[FAIL] Timed out after {0} waiting for Docker images/containers to be created." -f (Format-Elapsed -Elapsed ((Get-Date) - $start)))
+    $script:autoCloseSeconds = 5
 
     if ($dockerState.ImagesMissing.Count -gt 0) {
         Write-Host ("Missing images: {0}" -f ($dockerState.ImagesMissing -join ", "))
@@ -507,6 +609,7 @@ function Wait-ForDockerArtifacts {
 function Wait-ForStackHealth {
     param(
         [int]$TimeoutSeconds,
+        [int]$NoProgressTimeoutSeconds,
         [int]$PollIntervalSeconds
     )
 
@@ -515,6 +618,8 @@ function Wait-ForStackHealth {
     $announcedReady = @{}
     $start = Get-Date
     $deadline = $start.AddSeconds($TimeoutSeconds)
+    $lastProgressAt = $start
+    $lastStateSignature = ""
     $nextPollAt = $start
     $states = @()
 
@@ -523,6 +628,11 @@ function Wait-ForStackHealth {
 
         if ($now -ge $nextPollAt) {
             $states = Get-StackStates
+            $stateSignature = (($states | ForEach-Object { "{0}:{1}:{2}" -f $_.Name, $_.Stage, $_.Detail }) -join "|")
+            if ($stateSignature -ne $lastStateSignature) {
+                $lastStateSignature = $stateSignature
+                $lastProgressAt = $now
+            }
             $readyNames = [System.Collections.Generic.List[string]]::new()
 
             foreach ($state in ($states | Where-Object { $_.Display })) {
@@ -568,6 +678,26 @@ function Wait-ForStackHealth {
 
         Write-LiveLine -Text $line
         $spinnerIndex++
+
+        if (($now - $lastProgressAt).TotalSeconds -ge $NoProgressTimeoutSeconds) {
+            Clear-LiveLine
+            Write-Host ("[FAIL] No stack health progress detected for {0}. Stopping early." -f (Format-Elapsed -Elapsed ($now - $lastProgressAt))) -ForegroundColor Red
+            $script:autoCloseSeconds = 5
+            $states |
+                Select-Object `
+                    @{Name = "Service"; Expression = { $_.Name } }, `
+                    @{Name = "Status"; Expression = {
+                        switch ($_.Stage) {
+                            "Ready" { "UP" }
+                            "Starting" { "STARTING" }
+                            default { "WAIT" }
+                        }
+                    } }, `
+                    @{Name = "Details"; Expression = { $_.Detail } } |
+                Format-Table -AutoSize
+            return $false
+        }
+
         Start-Sleep -Milliseconds 150
     }
 
@@ -577,6 +707,7 @@ function Wait-ForStackHealth {
 
     Clear-LiveLine
     Write-Host ("[FAIL] Timed out after {0} waiting for the stack to become healthy." -f (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Red
+    $script:autoCloseSeconds = 5
     $states |
         Select-Object `
             @{Name = "Service"; Expression = { $_.Name } }, `
@@ -594,14 +725,14 @@ function Wait-ForStackHealth {
 }
 
 Write-Host "Checking Docker images and containers..." -ForegroundColor Cyan
-if (-not (Wait-ForDockerArtifacts -TimeoutSeconds $StartupTimeoutSeconds -PollIntervalSeconds $PollIntervalSeconds)) {
+if (-not (Wait-ForDockerArtifacts -TimeoutSeconds $StartupTimeoutSeconds -NoProgressTimeoutSeconds $NoProgressTimeoutSeconds -PollIntervalSeconds $PollIntervalSeconds)) {
     Wait-BeforeExit
     exit 1
 }
 
 Write-Host ""
 Write-Host "Watching stack startup..." -ForegroundColor Cyan
-if (-not (Wait-ForStackHealth -TimeoutSeconds $StartupTimeoutSeconds -PollIntervalSeconds $PollIntervalSeconds)) {
+if (-not (Wait-ForStackHealth -TimeoutSeconds $StartupTimeoutSeconds -NoProgressTimeoutSeconds $NoProgressTimeoutSeconds -PollIntervalSeconds $PollIntervalSeconds)) {
     Wait-BeforeExit
     exit 1
 }
