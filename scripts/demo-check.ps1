@@ -23,6 +23,7 @@ $failed = $false
 $gatewayReady = $false
 $eurekaReady = $false
 $script:lastLiveLineLength = 0
+$script:stackName = Split-Path -Leaf (Split-Path -Parent $PSScriptRoot)
 
 $expectedDockerImages = @(
     "library-microservices/discovery-server:local",
@@ -420,23 +421,10 @@ function Get-DockerArtifactState {
     }
 }
 
-function Get-DockerProgressStatus {
-    param([object]$DockerState)
+function Get-DockerImageDisplayName {
+    param([string]$Image)
 
-    if (-not $DockerState.DockerAvailable) {
-        return "Docker CLI not found. Skipping image/container wait."
-    }
-
-    if ($DockerState.ImagesMissing.Count -gt 0) {
-        $nextImage = ($DockerState.ImagesMissing[0] -split "[:/]")[-2]
-        return "Building local images ($($DockerState.ImagesFound.Count)/$($expectedDockerImages.Count)). Next: $nextImage"
-    }
-
-    if ($DockerState.ContainersMissing.Count -gt 0) {
-        return "Creating containers ($($DockerState.ContainersFound.Count)/$($expectedDockerContainers.Count)). Next: $($DockerState.ContainersMissing[0])"
-    }
-
-    return "Docker images and containers are ready."
+    return ($Image -split "[:/]")[-2]
 }
 
 function Wait-ForDockerArtifacts {
@@ -446,42 +434,73 @@ function Wait-ForDockerArtifacts {
     )
 
     if (-not (Test-DockerCliAvailable)) {
-        Write-Host "[WARN] Docker CLI was not found on PATH. Skipping Docker image/container wait." -ForegroundColor Yellow
+        Write-Host "[WARN] Docker CLI was not found on PATH. Skipping Docker image/container wait."
         return $true
     }
 
     $start = Get-Date
     $deadline = $start.AddSeconds($TimeoutSeconds)
+    $waitingMessageShown = $false
+    $announcedDockerReady = @{}
 
     while ((Get-Date) -lt $deadline) {
         $dockerState = Get-DockerArtifactState
-        $progressPercent = [Math]::Floor((($dockerState.ImagesFound.Count + $dockerState.ContainersFound.Count) / ($expectedDockerImages.Count + $expectedDockerContainers.Count)) * 100)
-        $status = Get-DockerProgressStatus -DockerState $dockerState
 
-        Write-Progress -Activity "Preparing Docker stack" -Status $status -PercentComplete $progressPercent
+        $newImageNames = [System.Collections.Generic.List[string]]::new()
+        $newContainerNames = [System.Collections.Generic.List[string]]::new()
+
+        foreach ($image in $dockerState.ImagesFound) {
+            if (-not $announcedDockerReady.ContainsKey($image)) {
+                $newImageNames.Add((Get-DockerImageDisplayName -Image $image)) | Out-Null
+                $announcedDockerReady[$image] = $true
+            }
+        }
+
+        foreach ($container in $dockerState.ContainersFound) {
+            $containerKey = "container::$container"
+            if (-not $announcedDockerReady.ContainsKey($containerKey)) {
+                $newContainerNames.Add($container) | Out-Null
+                $announcedDockerReady[$containerKey] = $true
+            }
+        }
+
+        if ($newImageNames.Count -gt 0) {
+            $label = if ($newImageNames.Count -eq 1) { "Image Ready" } else { "Images Ready" }
+            Write-Host ("[OK] {0}: {1}" -f $label, (($newImageNames | ForEach-Object { $_ }) -join ", ")) -ForegroundColor Green
+        }
+
+        if ($newContainerNames.Count -gt 0) {
+            $label = if ($newContainerNames.Count -eq 1) { "Container Ready" } else { "Containers Ready" }
+            Write-Host ("[OK] {0}: {1}" -f $label, (($newContainerNames | ForEach-Object { $_ }) -join ", ")) -ForegroundColor Green
+        }
 
         if ($dockerState.ImagesMissing.Count -eq 0 -and $dockerState.ContainersMissing.Count -eq 0) {
-            Write-Progress -Activity "Preparing Docker stack" -Completed
-            Write-Host ("[OK] Docker images and containers are ready after {0}." -f (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Green
+            if ($waitingMessageShown) {
+                Write-Host ("[OK] Stack Ready: {0} is ready after {1}." -f $script:stackName, (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Green
+            }
             return $true
+        }
+
+        if (-not $waitingMessageShown) {
+            Write-Host "Waiting for Docker images and containers to be ready..."
+            $waitingMessageShown = $true
         }
 
         Start-Sleep -Seconds $PollIntervalSeconds
     }
 
     $dockerState = Get-DockerArtifactState
-    Write-Progress -Activity "Preparing Docker stack" -Completed
-    Write-Host ("[FAIL] Timed out after {0} waiting for Docker images/containers to be created." -f (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Red
+    Write-Host ("[FAIL] Timed out after {0} waiting for Docker images/containers to be created." -f (Format-Elapsed -Elapsed ((Get-Date) - $start)))
 
     if ($dockerState.ImagesMissing.Count -gt 0) {
-        Write-Host ("Missing images: {0}" -f ($dockerState.ImagesMissing -join ", ")) -ForegroundColor DarkYellow
+        Write-Host ("Missing images: {0}" -f ($dockerState.ImagesMissing -join ", "))
     }
 
     if ($dockerState.ContainersMissing.Count -gt 0) {
-        Write-Host ("Missing containers: {0}" -f ($dockerState.ContainersMissing -join ", ")) -ForegroundColor DarkYellow
+        Write-Host ("Missing containers: {0}" -f ($dockerState.ContainersMissing -join ", "))
     }
 
-    Write-Host "Start the stack with 'docker compose up --build -d' and retry once Docker is still running." -ForegroundColor DarkYellow
+    Write-Host "Start the stack with 'docker compose up --build -d' and retry once Docker is still running."
     return $false
 }
 
@@ -515,12 +534,13 @@ function Wait-ForStackHealth {
 
             if ($readyNames.Count -gt 0) {
                 Clear-LiveLine
-                Write-Host ("[OK] Ready: {0}" -f (Format-ServiceList -States ($states | Where-Object { $readyNames -contains $_.Name }) -MaxItems 4)) -ForegroundColor Green
+                $label = if ($readyNames.Count -eq 1) { "Service Ready" } else { "Services Ready" }
+                Write-Host ("[OK] {0}: {1}" -f $label, (Format-ServiceList -States ($states | Where-Object { $readyNames -contains $_.Name }) -MaxItems 4)) -ForegroundColor Green
             }
 
             if (@($states | Where-Object { $_.Ready }).Count -eq $states.Count) {
                 Clear-LiveLine
-                Write-Host ("[OK] Stack is healthy after {0}. Running smoke checks..." -f (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Green
+                Write-Host ("[OK] Demo Stack Ready: stack is healthy after {0}. Running smoke checks..." -f (Format-Elapsed -Elapsed ((Get-Date) - $start))) -ForegroundColor Green
                 return $true
             }
 
@@ -767,5 +787,5 @@ if ($failed) {
 }
 
 Write-Host ""
-Write-Host "Pre-demo check passed. The happy-path demo is ready." -ForegroundColor Green
+Write-Host "[OK] Demo Check Ready: the happy-path demo is ready." -ForegroundColor Green
 Wait-BeforeExit
