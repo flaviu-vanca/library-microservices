@@ -145,7 +145,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-auth:3306/auth_db
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
       - AUTH_OAUTH2_SUCCESS_REDIRECT_URI=http://localhost:${GATEWAY_HOST_PORT:-8085}/
       - AUTH_OAUTH2_CALLBACK_REDIRECT_URI=http://localhost:${GATEWAY_HOST_PORT:-8085}/auth/login/oauth2/code/{registrationId}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
@@ -186,7 +186,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-library:3306/library_db
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
     depends_on:
       discovery-server:
         condition: service_healthy
@@ -219,7 +219,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-library:3306/library_db
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
     depends_on:
       discovery-server:
         condition: service_healthy
@@ -252,7 +252,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-inventory:3306/inventory_db
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
     depends_on:
       discovery-server:
         condition: service_healthy
@@ -282,7 +282,7 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URI=http://config-server:8888
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
     depends_on:
       discovery-server:
         condition: service_healthy

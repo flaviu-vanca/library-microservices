@@ -79,6 +79,16 @@ resilience4j:
         baseConfig: default
       inventoryCircuitBreaker:
         baseConfig: default
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
+        cancelRunningFuture: true
+    instances:
+      libraryCircuitBreaker:
+        baseConfig: default
+      inventoryCircuitBreaker:
+        baseConfig: default
 
 management:
   endpoint:

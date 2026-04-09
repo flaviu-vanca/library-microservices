@@ -66,15 +66,27 @@ management:
   tracing:
     sampling:
       probability: 1.0
-  zipkin:
-    tracing:
-      endpoint: http://localhost:9411/api/v2/spans
+    export:
+      zipkin:
+        endpoint: http://localhost:9411/api/v2/spans
 
 # Logging
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
     reactor.netty: INFO
+
+resilience4j:
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 3s
+        cancelRunningFuture: true
+    instances:
+      libraryCircuitBreaker:
+        baseConfig: default
+      inventoryCircuitBreaker:
+        baseConfig: default
 
 # Local fallback for early startup before Config Server is reachable.
 jwt:

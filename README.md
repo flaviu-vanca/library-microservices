@@ -261,7 +261,6 @@ repo-root/
 ├── docker-compose.yml             # Full stack: services + infra + health ordering
 ├── Dockerfile.service             # Multi-stage build for all Spring Boot modules
 ├── .env.example                   # Port / credential overrides (copy → .env to use)
-├── RUN-AND-DEMO-GUIDE.md
 ├── ZIPKIN-GUIDE.md
 │
 ├── config-repo/                   # Externalized YAML consumed by Config Server
